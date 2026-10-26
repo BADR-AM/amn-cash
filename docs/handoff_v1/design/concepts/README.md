@@ -1,0 +1,2 @@
+# Visual concept boards (reference only)
+These are AI-generated visual inspirations created earlier in the design discussion, and are NOT pixel-perfect UI specifications or approved production brand artwork. They may include Vodafone names/logos, synthetic dates and numeric figures, or inaccurate Arabic typography. **Do not ship third-party trademarks, fake transaction samples, inaccurate labels, or the images as app assets.** Follow the HTML wireframe and the UI/UX spec for behavior, and implement original branded assets with lawful use.

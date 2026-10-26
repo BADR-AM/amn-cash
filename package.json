@@ -1,0 +1,43 @@
+{
+  "name": "amn-cash",
+  "version": "1.0.0",
+  "description": "نظام إدارة ومتابعة معاملات وأرباح فودافون كاش - AMN Cash",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "server": "node server/server.js",
+    "dev:full": "concurrently \"node server/server.js\" \"vite\"",
+    "start": "concurrently \"node server/server.js\" \"vite\"",
+    "electron": "electron .",
+    "build": "vite build",
+    "test:fees": "python -m unittest discover -s docs/handoff_v1/tests -v"
+  },
+  "keywords": [
+    "vodafone-cash",
+    "wallet",
+    "financial-manager",
+    "amn-cash"
+  ],
+  "author": "AMN",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "lucide-react": "^0.475.0",
+    "qrcode": "^1.5.4",
+    "sqlite3": "^5.1.7",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.2",
+    "electron": "^34.2.0",
+    "postcss": "^8.5.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.17",
+    "vite": "^6.1.0"
+  }
+}

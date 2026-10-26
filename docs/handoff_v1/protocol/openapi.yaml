@@ -1,0 +1,164 @@
+openapi: 3.0.3
+info:
+  title: Wallet Receiver to Windows API (design draft)
+  version: 1.0.0-draft
+  description: >-
+    This contract is an implementation proposal requiring cross-platform test vectors and review.
+    Observe financial SMS; do not mark payment settled from SMS alone. All routes require authenticated TLS;
+    /v1/pair uses short-lived one-time bootstrap, others per-device authentication.
+servers:
+  - url: https://wallet-manager.local:7443
+paths:
+  /v1/pair:
+    post:
+      summary: Pair a new Android phone using a single-use QR bootstrap ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PairRequest'
+      responses:
+        '200':
+          description: Pairing successful (credentials must be provisioned securely)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deviceId, serverTime]
+                properties:
+                  deviceId: {type: string}
+                  serverTime: {type: string, format: date-time}
+        '401': {description: Invalid or expired ticket}
+        '409': {description: Ticket already used}
+  /v1/events:
+    post:
+      summary: Commit authorized financial SMS events (idempotently)
+      security:
+        - DeviceSignature: []
+      parameters:
+        - in: header
+          name: X-Device-Id
+          schema: {type: string}
+          required: true
+        - in: header
+          name: X-Timestamp
+          schema: {type: string}
+          required: true
+        - in: header
+          name: X-Nonce
+          schema: {type: string}
+          required: true
+        - in: header
+          name: X-Signature
+          schema: {type: string}
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items: {$ref: '#/components/schemas/SmsEvent'}
+      responses:
+        '200':
+          description: Durable transaction committed, including replay IDs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [acceptedEventIds, duplicateEventIds]
+                properties:
+                  acceptedEventIds:
+                    type: array
+                    items: {type: string}
+                  duplicateEventIds:
+                    type: array
+                    items: {type: string}
+        '400': {description: Malformed event (do not silently discard)}
+        '401': {description: Unknown/revoked device}
+        '409': {description: Sequence conflict requiring investigation}
+        '500': {description: Temporary server failure; sender should retry}
+  /v1/device/heartbeat:
+    post:
+      summary: Non-sensitive operational heartbeat
+      security:
+        - DeviceSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deviceId, pendingCount, lastSequence]
+              properties:
+                deviceId: {type: string}
+                pendingCount: {type: integer, minimum: 0}
+                lastSequence: {type: integer, minimum: 0}
+                permissionGranted: {type: boolean}
+                appVersion: {type: string}
+      responses:
+        '200': {description: OK}
+        '401': {description: Not authorized}
+  /v1/sync/status:
+    get:
+      summary: Authorized device sync checkpoint
+      security:
+        - DeviceSignature: []
+      responses:
+        '200':
+          description: Checkpoint
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  acceptedSequence: {type: integer, minimum: 0}
+        '401': {description: Unauthorized}
+  /v1/device/unpair:
+    post:
+      summary: Revoke current device (admin approval required on server)
+      security:
+        - DeviceSignature: []
+      responses:
+        '200': {description: Device revoked}
+        '403': {description: Insufficient authority}
+components:
+  securitySchemes:
+    DeviceSignature:
+      type: apiKey
+      in: header
+      name: X-Signature
+      description: >-
+        HMAC proof bound to device id, HTTP method, path, raw request body digest,
+        timestamp and nonce; exact canonical message and replay policy require golden test vectors.
+  schemas:
+    PairRequest:
+      type: object
+      required: [pairingTicket, devicePublicKey, requestedDeviceName]
+      properties:
+        pairingTicket: {type: string}
+        devicePublicKey: {type: string, description: Base64 public key as per approved pairing design}
+        requestedDeviceName: {type: string, maxLength: 120}
+    SmsEvent:
+      type: object
+      required: [schemaVersion, eventId, deviceId, sequenceNumber, walletId, eventType, receivedAt, senderLabel, message, contentHash, parserProfileVersion]
+      properties:
+        schemaVersion: {type: integer, enum: [1]}
+        eventId: {type: string, format: uuid}
+        deviceId: {type: string}
+        sequenceNumber: {type: integer, minimum: 1}
+        walletId: {type: string}
+        eventType: {type: string, enum: [financial_sms_observed]}
+        receivedAt: {type: string, format: date-time}
+        senderLabel: {type: string, maxLength: 100}
+        simSlot: {type: integer, minimum: 0}
+        message: {type: string, description: Only approved financial message; no OTP or PIN}
+        contentHash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        parserProfileVersion: {type: string}

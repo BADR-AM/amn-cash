@@ -1,0 +1,5 @@
+amount_egp,service_fee_egp,estimated_cost_egp,estimated_profit_egp,calculation_mode,notes
+1000.00,50.00,10.00,40.00,PRO_RATA,default
+1500.00,75.00,15.00,60.00,PRO_RATA,default
+5000.00,250.00,50.00,200.00,PRO_RATA,default
+1.00,0.05,0.01,0.04,PRO_RATA,rounding_reference

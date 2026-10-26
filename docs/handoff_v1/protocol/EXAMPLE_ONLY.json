@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "eventId": "09e3015b-0e78-42d1-a7d9-b223c4970e5b",
+  "deviceId": "demo_phone_01",
+  "sequenceNumber": 5,
+  "walletId": "demo_vf_wallet_01",
+  "eventType": "financial_sms_observed",
+  "receivedAt": "2026-10-27T12:30:00+03:00",
+  "senderLabel": "SYNTHETIC_SENDER",
+  "simSlot": 1,
+  "message": "[SYNTHETIC APPROVED FINANCIAL SMS - NOT A REAL VODAFONE FORMAT]",
+  "contentHash": "70bd095990215d1f2eac59a8fb1e84f023d4c824f5d7ed8f253e99745c524936",
+  "parserProfileVersion": "example-test-only-v1"
+}

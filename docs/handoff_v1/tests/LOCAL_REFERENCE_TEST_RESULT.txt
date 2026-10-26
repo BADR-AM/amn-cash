@@ -1,0 +1,10 @@
+test_changes_to_rates (test_fee_reference.TestFeeReference.test_changes_to_rates) ... ok
+test_defaults (test_fee_reference.TestFeeReference.test_defaults) ... ok
+test_reject_invalid (test_fee_reference.TestFeeReference.test_reject_invalid) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK
+
+Exit code: 0

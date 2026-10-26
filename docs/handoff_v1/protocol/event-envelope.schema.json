@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/wallet-ops/event-envelope-v1.json",
+  "title": "Wallet Financial SMS Event V1 (draft)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "eventId",
+    "deviceId",
+    "sequenceNumber",
+    "walletId",
+    "eventType",
+    "receivedAt",
+    "senderLabel",
+    "message",
+    "contentHash",
+    "parserProfileVersion"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "deviceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sequenceNumber": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "walletId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "eventType": {
+      "const": "financial_sms_observed"
+    },
+    "receivedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "senderLabel": {
+      "type": "string"
+    },
+    "simSlot": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "parserProfileVersion": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
