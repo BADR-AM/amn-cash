@@ -23,7 +23,7 @@ export default {
         slatebg: '#f3f5f8',
       },
       fontFamily: {
-        sans: ['"Segoe UI"', 'Cairo', 'Tahoma', 'Arial', 'sans-serif'],
+        sans: ['Cairo', '"Segoe UI"', 'Tahoma', 'Arial', 'sans-serif'],
       }
     },
   },
