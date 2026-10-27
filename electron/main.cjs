@@ -1,39 +1,27 @@
 const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { pathToFileURL } = require('url');
 
 let mainWindow;
-let serverProcess;
 
-function startBackendServer() {
+async function startBackendServer() {
   const isDev = !app.isPackaged;
-  const appPath = isDev ? app.getAppPath() : app.getAppPath().replace('app.asar', 'app.asar.unpacked');
-  const serverScript = path.join(appPath, 'server/server.js');
-  
-  // Use Electron's own built-in Node.js runtime so NO external Node.js installation is needed!
-  const nodeBinary = isDev ? 'node' : process.execPath;
   const userDataPath = app.getPath('userData');
   const dataDir = path.join(userDataPath, 'data');
 
-  const env = {
-    ...process.env,
-    PORT: '5500',
-    NODE_ENV: isDev ? 'development' : 'production',
-    IS_PACKAGED: isDev ? 'false' : 'true',
-    AMN_DATA_DIR: dataDir,
-    ELECTRON_RUN_AS_NODE: '1'
-  };
+  process.env.PORT = '5500';
+  process.env.NODE_ENV = isDev ? 'development' : 'production';
+  process.env.IS_PACKAGED = isDev ? 'false' : 'true';
+  process.env.AMN_DATA_DIR = dataDir;
 
-  serverProcess = spawn(nodeBinary, [serverScript], {
-    stdio: 'ignore', // Keep clean, no black cmd popup in production
-    env,
-    windowsHide: true
-  });
-
-  serverProcess.on('error', (err) => {
-    console.error('Failed to spawn background server:', err);
-  });
+  try {
+    const serverPath = path.join(__dirname, '../server/server.js');
+    await import(pathToFileURL(serverPath).href);
+    console.log('✓ AMN Cash internal backend started inside Electron process');
+  } catch (err) {
+    console.error('Failed to import backend server directly:', err);
+  }
 }
 
 function createWindow() {
@@ -110,10 +98,9 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
-  startBackendServer();
-  // Small delay to allow express server to bind port
-  setTimeout(createWindow, 1000);
+app.whenReady().then(async () => {
+  await startBackendServer();
+  createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -122,15 +109,6 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    if (serverProcess) {
-      serverProcess.kill();
-    }
     app.quit();
-  }
-});
-
-app.on('will-quit', () => {
-  if (serverProcess) {
-    serverProcess.kill();
   }
 });
