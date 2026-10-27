@@ -7,7 +7,7 @@ let serverProcess;
 
 function startBackendServer() {
   const isDev = !app.isPackaged;
-  const appPath = app.getAppPath();
+  const appPath = isDev ? app.getAppPath() : app.getAppPath().replace('app.asar', 'app.asar.unpacked');
   const serverScript = path.join(appPath, 'server/server.js');
   
   // Use Electron's own built-in Node.js runtime so NO external Node.js installation is needed!
@@ -52,9 +52,40 @@ function createWindow() {
 
   Menu.setApplicationMenu(null); // Clean window without old-style menus
 
+  // Enable F12 / DevTools shortcut
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
+
   const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-  const startUrl = process.env.ELECTRON_START_URL || (isDev ? 'http://localhost:5174' : `file://${path.join(__dirname, '../dist/index.html')}`);
-  mainWindow.loadURL(startUrl);
+  const devUrl = process.env.ELECTRON_START_URL || 'http://localhost:5174';
+
+  if (isDev && process.env.ELECTRON_START_URL) {
+    mainWindow.loadURL(devUrl);
+  } else {
+    // In production, poll until embedded server is ready, then load seamlessly
+    const http = require('http');
+    let attempts = 0;
+    const maxAttempts = 30; // up to 6s
+
+    const checkServer = () => {
+      attempts++;
+      http.get('http://localhost:5500/api/settings', (res) => {
+        mainWindow.loadURL('http://localhost:5500');
+      }).on('error', () => {
+        if (attempts < maxAttempts) {
+          setTimeout(checkServer, 200);
+        } else {
+          mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+        }
+      });
+    };
+
+    checkServer();
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;

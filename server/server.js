@@ -559,6 +559,23 @@ app.get('/api/backup/download', async (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
+// Static Frontend Files & SPA Fallback
+// -----------------------------------------------------------------------------
+let distPath = path.resolve(__dirname, '../dist');
+if (!fs.existsSync(distPath)) {
+  const asarDist = path.resolve(__dirname, '../../app.asar/dist');
+  if (fs.existsSync(asarDist)) distPath = asarDist;
+}
+
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
+
+// -----------------------------------------------------------------------------
 // Initialize and Start Server
 // -----------------------------------------------------------------------------
 const PORT = process.env.PORT || 5500;
