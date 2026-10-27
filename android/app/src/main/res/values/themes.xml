@@ -1,0 +1,7 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.AMNCash" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/voda_red</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="android:colorBackground">@color/bg_light</item>
+    </style>
+</resources>

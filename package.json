@@ -11,7 +11,41 @@
     "start": "concurrently \"node server/server.js\" \"vite\"",
     "electron": "electron .",
     "build": "vite build",
+    "pack": "vite build && electron-builder --dir",
+    "dist:win": "vite build && electron-builder --win nsis",
     "test:fees": "python -m unittest discover -s docs/handoff_v1/tests -v"
+  },
+  "build": {
+    "appId": "com.amn.cash",
+    "productName": "AMN Cash",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "server/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AMN Cash",
+      "uninstallDisplayName": "AMN Cash - إدارة فودافون كاش",
+      "runAfterFinish": true
+    }
   },
   "keywords": [
     "vodafone-cash",

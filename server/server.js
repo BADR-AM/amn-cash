@@ -2,10 +2,16 @@ import express from 'express';
 import cors from 'cors';
 import http from 'http';
 import os from 'os';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import QRCode from 'qrcode';
 import { initDatabase, runQuery, getQuery, allQuery } from './db.js';
 import { calculateFees } from './feeEngine.js';
 import { parseVodafoneCashSms, isSensitiveMessage } from './smsParser.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
@@ -393,6 +399,16 @@ app.get('/api/pairing-qr', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7. Backup Download
+app.get('/api/backup/download', (req, res) => {
+  const dbFile = path.resolve(__dirname, '../data/amn_cash.sqlite');
+  if (fs.existsSync(dbFile)) {
+    res.download(dbFile, `AMN_Cash_Backup_${new Date().toISOString().slice(0, 10)}.sqlite`);
+  } else {
+    res.status(404).json({ success: false, error: 'Database file not found' });
   }
 });
 

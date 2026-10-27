@@ -9,13 +9,16 @@ import {
   CheckCircle2, 
   FileText, 
   Download,
+  Printer,
   X
 } from 'lucide-react';
+import ReceiptModal from './ReceiptModal.jsx';
 
-export default function Transactions({ transactions, onNewTransaction, onRefresh }) {
+export default function Transactions({ transactions, settings, onNewTransaction, onRefresh }) {
   const [filterType, setFilterType] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTx, setSelectedTx] = useState(null);
+  const [receiptTx, setReceiptTx] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Form state for manual transaction
@@ -197,13 +200,22 @@ export default function Transactions({ transactions, onNewTransaction, onRefresh
                         </span>
                       </td>
                       <td className="py-3.5 px-5 text-center">
-                        <button
-                          onClick={() => setSelectedTx(tx)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-[#ca1535] hover:bg-red-50 transition-colors"
-                          title="عرض تفاصيل الرسالة"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => setReceiptTx(tx)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                            title="طباعة إيصال للعملية"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setSelectedTx(tx)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-[#ca1535] hover:bg-red-50 transition-colors"
+                            title="عرض تفاصيل الرسالة"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -276,10 +288,20 @@ export default function Transactions({ transactions, onNewTransaction, onRefresh
               )}
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setReceiptTx(selectedTx);
+                  setSelectedTx(null);
+                }}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                <Printer className="w-4 h-4" />
+                <span>طباعة إيصال معتمد</span>
+              </button>
               <button
                 onClick={() => setSelectedTx(null)}
-                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+                className="py-2.5 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
               >
                 إغلاق
               </button>
@@ -287,6 +309,14 @@ export default function Transactions({ transactions, onNewTransaction, onRefresh
           </div>
         </div>
       )}
+
+      {/* Printable Receipt Modal */}
+      <ReceiptModal 
+        transaction={receiptTx}
+        settings={settings}
+        isOpen={!!receiptTx}
+        onClose={() => setReceiptTx(null)}
+      />
 
       {/* Manual Add Transaction Modal */}
       {isAddModalOpen && (

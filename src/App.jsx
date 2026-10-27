@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Bell, ArrowDownLeft, ArrowUpRight, X } from 'lucide-react';
 import Sidebar from './components/Sidebar.jsx';
 import Header from './components/Header.jsx';
 import Dashboard from './components/Dashboard.jsx';
@@ -8,6 +9,42 @@ import Reports from './components/Reports.jsx';
 import DevicesAndSync from './components/DevicesAndSync.jsx';
 import SettingsView from './components/SettingsView.jsx';
 import SmsSimulatorModal from './components/SmsSimulatorModal.jsx';
+
+// Web Audio Chime on new payment
+function playPaymentSound() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const now = ctx.currentTime;
+    
+    // Note 1
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'triangle';
+    osc1.frequency.setValueAtTime(523.25, now); // C5
+    gain1.gain.setValueAtTime(0.25, now);
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.2);
+
+    // Note 2
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(783.99, now + 0.12); // G5
+    gain2.gain.setValueAtTime(0.3, now + 0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.12);
+    osc2.stop(now + 0.45);
+  } catch (e) {
+    // Silent fallback
+  }
+}
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
@@ -29,6 +66,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
   const [lastSync, setLastSync] = useState('منذ 10 ثوانٍ');
+  const [toastNotification, setToastNotification] = useState(null);
 
   // Load Initial Data
   const fetchData = async () => {
@@ -81,6 +119,14 @@ export default function App() {
           if (msg.type === 'NEW_TRANSACTION') {
             // New transaction received in real-time
             fetchData();
+            playPaymentSound();
+            setToastNotification({
+              type: msg.data.type,
+              amount: msg.data.amountEGP,
+              phone: msg.data.senderOrRecipient,
+              profit: msg.data.profitEGP
+            });
+            setTimeout(() => setToastNotification(null), 5000);
           } else if (msg.type === 'SETTINGS_UPDATED') {
             setSettings(prev => ({ ...prev, ...msg.data }));
           }
@@ -188,6 +234,7 @@ export default function App() {
           {currentTab === 'transactions' && (
             <Transactions 
               transactions={transactions}
+              settings={settings}
               onRefresh={fetchData}
             />
           )}
@@ -226,6 +273,37 @@ export default function App() {
         onClose={() => setIsSimulatorOpen(false)}
         onTransactionCreated={fetchData}
       />
+      {/* 4. Live Incoming Transaction Toast Alert */}
+      {toastNotification && (
+        <div className="fixed top-6 left-6 z-50 bg-white border-2 border-emerald-500 rounded-2xl shadow-2xl p-4 flex items-center gap-3.5 max-w-sm animate-in slide-in-from-top-4 duration-300">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+            {toastNotification.type === 'INCOMING' ? (
+              <ArrowDownLeft className="w-5 h-5 text-emerald-600" />
+            ) : (
+              <ArrowUpRight className="w-5 h-5 text-red-600" />
+            )}
+          </div>
+          <div className="flex-1 text-right text-xs">
+            <span className="font-extrabold text-slate-900 block text-sm">
+              تم رصد معاملة جديدة فورياً!
+            </span>
+            <span className="text-slate-600 font-medium block">
+              {toastNotification.phone} • بمبلغ <strong className="font-bold text-slate-900">{toastNotification.amount} ج</strong>
+            </span>
+            {toastNotification.profit > 0 && (
+              <span className="text-emerald-600 font-bold block mt-0.5">
+                الربح الصافي: +{toastNotification.profit} ج
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setToastNotification(null)}
+            className="p-1 rounded-full text-slate-400 hover:text-slate-600"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,10 @@
+<resources>
+    <color name="voda_red">#CA1535</color>
+    <color name="voda_red_dark">#8C0F25</color>
+    <color name="voda_red_light">#FDE6E8</color>
+    <color name="bg_light">#F3F5F8</color>
+    <color name="text_dark">#192336</color>
+    <color name="text_muted">#68748A</color>
+    <color name="success_green">#10895C</color>
+    <color name="amber_warning">#D97706</color>
+</resources>

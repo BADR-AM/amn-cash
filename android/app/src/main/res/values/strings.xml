@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">AMN Cash Collector</string>
+    <string name="service_running_title">AMN Cash يعمل في الخلفية</string>
+    <string name="service_running_desc">التقاط وإرسال رسائل فودافون كاش للكمبيوتر</string>
+    
+    <!-- Wizard strings -->
+    <string name="wizard_welcome_title">مرحباً بك في AMN Cash</string>
+    <string name="wizard_welcome_desc">تطبيق التقاط ومزامنة رسائل فودافون كاش لربط هاتفك ببرنامج سطح المكتب عبر شبكة الـ Wi-Fi المحلية.</string>
+    <string name="wizard_perm_title">الأذونات المطلوبة</string>
+    <string name="wizard_perm_desc">يحتاج التطبيق لإذن قراءة رسائل SMS لرصد عمليات السحب والإيداع. يتم حظر وتجاهل أي رسائل سرية أو OTP تلقائياً لحماية أمانك.</string>
+    <string name="wizard_battery_title">استثناء توفير الطاقة</string>
+    <string name="wizard_battery_desc">يرجى تعطيل توفير الطاقة للتطبيق لضمان عدم إيقاف النظام لعملية التقاط الرسائل عند قفل الشاشة.</string>
+    <string name="wizard_pair_title">مسح كود QR للربط</string>
+    <string name="wizard_pair_desc">امسح الكود المعروض في شاشة (الأجهزة والاتصال) ببرنامج الويندوز.</string>
+</resources>

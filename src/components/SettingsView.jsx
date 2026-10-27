@@ -33,7 +33,7 @@ export default function SettingsView({ settings, onSaveSettings }) {
   };
 
   const handleBackup = () => {
-    alert('تم إنشاء نسخة احتياطية من قاعدة بيانات SQLite في مجلد backups بنجاح!');
+    window.location.href = '/api/backup/download';
   };
 
   return (
