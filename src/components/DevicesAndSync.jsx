@@ -15,7 +15,7 @@ import {
   Trash2
 } from 'lucide-react';
 
-export default function DevicesAndSync({ onOpenSimulator }) {
+export default function DevicesAndSync({ onOpenSimulator, phoneStatus, onRefreshPhoneStatus }) {
   const [deviceInfo, setDeviceInfo] = useState(null);
   const [qrData, setQrData] = useState(null);
   const [downloadInfo, setDownloadInfo] = useState(null);
@@ -30,6 +30,7 @@ export default function DevicesAndSync({ onOpenSimulator }) {
       const data = await res.json();
       if (data.success) {
         setDeviceInfo(data.data);
+        if (onRefreshPhoneStatus) onRefreshPhoneStatus();
       }
 
       const qrRes = await fetch('/api/pairing-qr');
@@ -273,9 +274,15 @@ export default function DevicesAndSync({ onOpenSimulator }) {
                   <div>
                     <div className="flex items-center gap-2">
                       <h4 className="font-extrabold text-slate-900 text-sm">{dev.device_name}</h4>
-                      <span className="flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-green"></span>
-                        {dev.status === 'CONNECTED' ? 'متصل ونشط' : 'غير متصل'}
+                      <span className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                        dev.status === 'CONNECTED' 
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                          : 'bg-red-100 text-red-800 border border-red-200'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          dev.status === 'CONNECTED' ? 'bg-emerald-500 pulse-green' : 'bg-red-500'
+                        }`}></span>
+                        {dev.status === 'CONNECTED' ? 'متصل ونشط' : 'غير متصل (مغلق)'}
                       </span>
                     </div>
                     <p className="text-xs font-mono text-slate-500 mt-1">IP: {dev.device_ip}</p>

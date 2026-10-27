@@ -64,67 +64,65 @@ export function parseVodafoneCashSms(rawText) {
 
   const normalized = normalizeDigits(rawText);
 
-  // Flexible, Comprehensive Regex patterns for all Egyptian Vodafone Cash templates
-  // 1. Incoming transfers (استلام / إيداع / تحويل من رقم X إلى محفظتك)
-  const incomingTransferFromMatch = normalized.match(/(?:تم\s+)?تحويل\s+(?:مبلغ\s+)?([\d,.]+)\s*(?:جنيه|ج\.م)?\s+من\s+(?:رقم\s+)?(\d{10,12})/i);
-  const incomingStandardMatch = normalized.match(/(?:تم\s+)?(?:استلام|إيداع)\s+(?:مبلغ\s+)?([\d,.]+)\s*(?:جنيه|ج\.م)?(?:\s+من\s+(?:رقم\s+)?(\d{10,12}))?/i);
-  const incomingMatch = incomingTransferFromMatch || incomingStandardMatch;
+  // Determine Transaction Direction with contextual understanding
+  let detectedType = null;
+  let typeLabel = null;
 
-  // 2. Outgoing transfers (تحويل إلى رقم X)
-  const outgoingMatch = normalized.match(/(?:تم\s+)?(?:تحويل|إرسال)\s+(?:مبلغ\s+)?([\d,.]+)\s*(?:جنيه|ج\.م)?\s+إلى\s+(?:رقم\s+)?(\d{10,12})/i);
+  if (normalized.includes('سحب')) {
+    detectedType = 'WITHDRAWAL';
+    typeLabel = 'سحب';
+  } else if (
+    normalized.includes('إلى محفظتك') || 
+    normalized.includes('في محفظتك') || 
+    normalized.includes('استلام') || 
+    normalized.includes('إيداع') ||
+    normalized.includes('تم استلام') ||
+    normalized.includes('تم إيداع')
+  ) {
+    detectedType = 'INCOMING';
+    typeLabel = 'وارد';
+  } else if (
+    normalized.includes('من محفظتك') || 
+    normalized.includes('من رقمك') || 
+    normalized.includes('إلى رقم') || 
+    normalized.includes('تحويل إلى') ||
+    normalized.includes('تم تحويل')
+  ) {
+    detectedType = 'OUTGOING';
+    typeLabel = 'صادر';
+  }
 
-  // 3. Cash Withdrawals (سحب من ATM أو فرع)
-  const withdrawalMatch = normalized.match(/(?:تم\s+)?سحب\s+(?:مبلغ\s+)?([\d,.]+)\s*(?:جنيه|ج\.م)?/i);
+  // Flexible Amount Matcher: finds any amount followed by currency or preceding currency
+  const amtMatch = normalized.match(/(?:مبلغ\s+)?([\d,.]+)\s*(?:جنيه|ج\.م)/i) ||
+                   normalized.match(/(?:استلام|إيداع|تحويل|سحب)\s+(?:مبلغ\s+)?([\d,.]+)/i);
 
   // Extract Operation / Reference Number
-  const opMatch = normalized.match(/(?:رقم\s+العملية|كود\s+العملية|المرجع|رقم\s+المرجع)\s*(?:هو|:)?\s*(\d{6,16})/i);
+  const opMatch = normalized.match(/(?:رقم\s+العملية|كود\s+العملية|كود|العملية|المرجع|رقم\s+المرجع)\s*(?:هو|:)?\s*(\d{6,16})/i);
   const referenceNumber = opMatch ? opMatch[1] : `REF-${crypto.randomUUID().slice(0, 8)}`;
 
   // Extract Balance if present
-  const balanceMatch = normalized.match(/رصيدك\s+الحالي\s*(?:هو|:)?\s*([\d,.]+)/i);
+  const balanceMatch = normalized.match(/رصيدك\s*(?:الحالي)?\s*(?:هو|:)?\s*([\d,.]+)/i);
   const balancePiasters = balanceMatch ? parseAmountToPiasters(balanceMatch[1]) : 0;
 
-  if (outgoingMatch) {
-    const amountPiasters = parseAmountToPiasters(outgoingMatch[1]);
-    const phone = outgoingMatch[2] || 'غير محدد';
-    if (amountPiasters > 0) {
-      return {
-        success: true,
-        type: 'OUTGOING',
-        typeLabel: 'صادر',
-        amountPiasters,
-        phone,
-        referenceNumber,
-        balancePiasters,
-        rawSms: rawText
-      };
-    }
+  // Extract Phone Number involved
+  let phone = 'غير محدد';
+  if (detectedType === 'INCOMING') {
+    const fromPhoneMatch = normalized.match(/من\s+(?:رقم\s+)?(\d{10,12})/i);
+    if (fromPhoneMatch) phone = fromPhoneMatch[1];
+  } else if (detectedType === 'OUTGOING') {
+    const toPhoneMatch = normalized.match(/إلى\s+(?:رقم\s+)?(\d{10,12})/i);
+    if (toPhoneMatch) phone = toPhoneMatch[1];
+  } else if (detectedType === 'WITHDRAWAL') {
+    phone = 'سحب نقدي (ATM / منفذ)';
   }
 
-  if (withdrawalMatch) {
-    const amountPiasters = parseAmountToPiasters(withdrawalMatch[1]);
-    if (amountPiasters > 0) {
+  if (amtMatch) {
+    const amountPiasters = parseAmountToPiasters(amtMatch[1]);
+    if (amountPiasters > 0 && detectedType) {
       return {
         success: true,
-        type: 'WITHDRAWAL',
-        typeLabel: 'سحب',
-        amountPiasters,
-        phone: 'سحب نقدي (ATM / منفذ)',
-        referenceNumber,
-        balancePiasters,
-        rawSms: rawText
-      };
-    }
-  }
-
-  if (incomingMatch) {
-    const amountPiasters = parseAmountToPiasters(incomingMatch[1]);
-    const phone = incomingMatch[2] || 'غير محدد';
-    if (amountPiasters > 0) {
-      return {
-        success: true,
-        type: 'INCOMING',
-        typeLabel: 'وارد',
+        type: detectedType,
+        typeLabel,
         amountPiasters,
         phone,
         referenceNumber,

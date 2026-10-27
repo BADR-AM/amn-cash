@@ -14,8 +14,17 @@ import {
   Save, 
   CheckCircle2,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Volume2,
+  BellRing,
+  Play
 } from 'lucide-react';
+import { 
+  playCashInSound, 
+  playCashOutSound, 
+  playDeviceDisconnectedSound, 
+  playDeviceConnectedSound 
+} from '../utils/audioAlerts.js';
 
 export default function SettingsView({ settings = {}, onSaveSettings }) {
   const [userName, setUserName] = useState(settings?.user_name || 'أحمد علي');
@@ -25,6 +34,7 @@ export default function SettingsView({ settings = {}, onSaveSettings }) {
   const [feePer1000, setFeePer1000] = useState(settings?.fee_per_1000 || '50');
   const [costPer1000, setCostPer1000] = useState(settings?.cost_per_1000 || '10');
   const [theme, setTheme] = useState(settings?.theme || 'light');
+  const [alertVolume, setAlertVolume] = useState(parseFloat(settings?.alert_volume) || 0.9);
   
   const [isSaved, setIsSaved] = useState(false);
 
@@ -40,7 +50,8 @@ export default function SettingsView({ settings = {}, onSaveSettings }) {
         fee_per_1000: feePer1000,
         cost_per_1000: costPer1000,
         profit_per_1000: profitPer1000.toString(),
-        theme
+        theme,
+        alert_volume: alertVolume.toString()
       });
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);
@@ -266,7 +277,85 @@ export default function SettingsView({ settings = {}, onSaveSettings }) {
           </div>
         </div>
 
-        {/* 6. إدارة البيانات وبدء الاستخدام الفعلي */}
+        {/* 6. التنبيهات والأصوات المالية */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <BellRing className="w-4 h-4 text-[#ca1535]" />
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-800">التنبيهات والأصوات الفورية</h3>
+                <p className="text-[11px] text-slate-400">أصوات تنبيه الكاشير عند استقبال تحويل، صرف كاش، أو انقطاع الهاتف</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Volume2 className="w-4 h-4 text-slate-500" />
+              <input 
+                type="range" 
+                min="0.1" 
+                max="1" 
+                step="0.05"
+                value={alertVolume}
+                onChange={(e) => setAlertVolume(parseFloat(e.target.value))}
+                className="w-24 accent-[#ca1535] cursor-pointer"
+                title={`مستوى الصوت: ${Math.round(alertVolume * 100)}%`}
+              />
+              <span className="text-[11px] font-mono text-slate-600 font-bold w-8">{Math.round(alertVolume * 100)}%</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <button
+              type="button"
+              onClick={() => playCashInSound(alertVolume)}
+              className="p-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-xl font-bold flex items-center justify-between transition-all active:scale-98"
+            >
+              <div className="flex items-center gap-2">
+                <Play className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600" />
+                <span>صوت استلام كاش (جرس الخزينة)</span>
+              </div>
+              <span className="text-[10px] bg-emerald-200/60 px-2 py-0.5 rounded-md">تجربة 🔔</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => playCashOutSound(alertVolume)}
+              className="p-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 rounded-xl font-bold flex items-center justify-between transition-all active:scale-98"
+            >
+              <div className="flex items-center gap-2">
+                <Play className="w-3.5 h-3.5 text-blue-600 fill-blue-600" />
+                <span>صوت سحب نقدي (صرف كاش)</span>
+              </div>
+              <span className="text-[10px] bg-blue-200/60 px-2 py-0.5 rounded-md">تجربة 💸</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => playDeviceDisconnectedSound(alertVolume)}
+              className="p-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-800 rounded-xl font-bold flex items-center justify-between transition-all active:scale-98"
+            >
+              <div className="flex items-center gap-2">
+                <Play className="w-3.5 h-3.5 text-red-600 fill-red-600" />
+                <span>صوت انقطاع الموبايل (إنذار غلق)</span>
+              </div>
+              <span className="text-[10px] bg-red-200/60 px-2 py-0.5 rounded-md">تجربة ⚠️</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => playDeviceConnectedSound(alertVolume)}
+              className="p-3 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-800 rounded-xl font-bold flex items-center justify-between transition-all active:scale-98"
+            >
+              <div className="flex items-center gap-2">
+                <Play className="w-3.5 h-3.5 text-purple-600 fill-purple-600" />
+                <span>صوت اتصال الموبايل بالمحل</span>
+              </div>
+              <span className="text-[10px] bg-purple-200/60 px-2 py-0.5 rounded-md">تجربة 📱</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 7. إدارة البيانات وبدء الاستخدام الفعلي */}
         <div className="bg-red-50/60 border border-red-200 rounded-2xl p-6 space-y-4 shadow-sm">
           <div className="flex items-center gap-2 pb-3 border-b border-red-200">
             <AlertTriangle className="w-5 h-5 text-[#ca1535]" />

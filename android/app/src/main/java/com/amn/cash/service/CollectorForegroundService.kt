@@ -7,10 +7,12 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.amn.cash.MainActivity
@@ -40,11 +42,25 @@ class CollectorForegroundService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var isRunning = false
+    private var wifiLock: WifiManager.WifiLock? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var heartbeatCycle = 0
 
     private val queueRunnable = object : Runnable {
         override fun run() {
             if (!isRunning) return
             try {
+                // 1. Send Heartbeat to Windows server every ~14 seconds
+                heartbeatCycle++
+                if (heartbeatCycle % 2 == 0) {
+                    WindowsApiClient.sendHeartbeat(applicationContext) { isAlive ->
+                        if (isAlive) {
+                            Log.d(TAG, "Heartbeat acknowledged by Windows PC")
+                        }
+                    }
+                }
+
+                // 2. Flush pending Outbox messages if any
                 val pendingCount = WindowsApiClient.getPendingCount(applicationContext)
                 if (pendingCount > 0) {
                     Log.i(TAG, "Found $pendingCount pending messages in Outbox. Flushing now...")
@@ -53,7 +69,7 @@ class CollectorForegroundService : Service() {
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Queue worker error: ${e.message}")
+                Log.e(TAG, "Queue/Heartbeat worker error: ${e.message}")
             }
             handler.postDelayed(this, 7000) // check every 7 seconds
         }
@@ -62,6 +78,26 @@ class CollectorForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+
+        // Acquire Wi-Fi Lock to prevent Wi-Fi chip sleep when screen turns off
+        try {
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            wifiLock = wifiManager?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "AMNCash:WifiLock")
+            wifiLock?.acquire()
+            Log.i(TAG, "WifiLock acquired for continuous standby connectivity")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not acquire WifiLock: ${e.message}")
+        }
+
+        // Acquire Partial WakeLock to keep CPU alive in background
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AMNCash:ServiceWakeLock")
+            wakeLock?.acquire()
+            Log.i(TAG, "Partial WakeLock acquired for continuous background execution")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not acquire WakeLock: ${e.message}")
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -78,6 +114,15 @@ class CollectorForegroundService : Service() {
     override fun onDestroy() {
         isRunning = false
         handler.removeCallbacks(queueRunnable)
+
+        try {
+            if (wifiLock?.isHeld == true) wifiLock?.release()
+        } catch (e: Exception) {}
+
+        try {
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+        } catch (e: Exception) {}
+
         super.onDestroy()
     }
 
@@ -110,7 +155,7 @@ class CollectorForegroundService : Service() {
         val subText = if (pendingCount > 0) {
             "⚠️ يوجد $pendingCount رسائل معلقة جاري محاولة إرسالها للكمبيوتر"
         } else {
-            "✓ جميع الرسائل متزامنة مع الكمبيوتر ($totalSent عملية)"
+            "✓ الهاتف متصل بالسيرفر وجاهز لاستقبال التحويلات ($totalSent عملية)"
         }
 
         val openIntent = Intent(this, MainActivity::class.java).apply {
@@ -122,7 +167,7 @@ class CollectorForegroundService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("AMN Cash متصل ويعمل")
+            .setContentTitle("AMN Cash متصل ويعمل في الخلفية")
             .setContentText(subText)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)

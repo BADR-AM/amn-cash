@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import appLogo from '../assets/app-logo.png';
 
-export default function Sidebar({ currentTab, setCurrentTab, onOpenSimulator, onOpenDownloadModal, isOnline, lastSync }) {
+export default function Sidebar({ currentTab, setCurrentTab, onOpenSimulator, onOpenDownloadModal, isOnline, lastSync, phoneStatus }) {
   const menuItems = [
     { id: 'dashboard', label: 'الرئيسية', icon: Home },
     { id: 'transactions', label: 'المعاملات', icon: ArrowLeftRight },
@@ -81,22 +81,25 @@ export default function Sidebar({ currentTab, setCurrentTab, onOpenSimulator, on
         {/* Bottom Live Status Matching Image 1 Exactly */}
         <div className="p-3.5 mx-3 mb-3 rounded-2xl bg-black/20 border border-white/10 text-xs text-red-100 space-y-2.5 backdrop-blur-sm">
           
-          {/* Green Running Dot */}
+          {/* Green Server Running Dot */}
           <div className="flex items-center gap-2 font-bold text-white text-[11px]">
             <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 pulse-green' : 'bg-red-400'}`}></span>
-            <span>{isOnline ? 'النظام يعمل' : 'جاري الاتصال...'}</span>
+            <span>{isOnline ? 'سيرفر الويندوز يعمل' : 'جاري الاتصال...'}</span>
           </div>
 
-          {/* Connected to Mobile */}
-          <div className="flex items-center gap-2 text-[11px] text-red-200">
-            <Smartphone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>متصل بالتطبيق المحمول</span>
+          {/* Real Live Phone Connection Status */}
+          <div className="flex items-center gap-2 text-[11px] pt-1.5 border-t border-white/10">
+            <span className={`w-2 h-2 rounded-full ${phoneStatus?.isConnected ? 'bg-emerald-400 pulse-green' : 'bg-red-400'}`}></span>
+            <Smartphone className={`w-3.5 h-3.5 ${phoneStatus?.isConnected ? 'text-emerald-300' : 'text-red-300'} shrink-0`} />
+            <span className={phoneStatus?.isConnected ? 'text-emerald-200 font-bold' : 'text-red-200 font-bold'}>
+              {phoneStatus?.isConnected ? 'الهاتف متصل وجاهز' : 'الهاتف غير متصل (مغلق)'}
+            </span>
           </div>
 
           {/* Last Sync Time */}
-          <div className="flex items-center gap-2 text-[10px] text-red-300 font-mono pt-1 border-t border-white/10">
+          <div className="flex items-center gap-2 text-[10px] text-red-300 font-mono">
             <Clock className="w-3 h-3 text-red-300 shrink-0" />
-            <span>آخر مزامنة: {lastSync || 'منذ 10 ثواني'}</span>
+            <span>{phoneStatus?.isConnected ? `آخر نشاط: ${phoneStatus.lastSync || 'الآن'}` : 'تنبيه: الموبايل غير متاح'}</span>
           </div>
 
         </div>

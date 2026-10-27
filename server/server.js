@@ -697,10 +697,34 @@ export function getActivePort() {
   return activePort;
 }
 
-// 6. Devices and Pairing QR Code
+// 6. Devices, Heartbeat & Pairing QR Code
 app.get('/api/devices', async (req, res) => {
   try {
-    const devices = await allQuery('SELECT * FROM devices ORDER BY last_sync DESC');
+    // 1. Mark devices as DISCONNECTED if no heartbeat/SMS in the last 35 seconds
+    await runQuery(`
+      UPDATE devices 
+      SET status = 'DISCONNECTED' 
+      WHERE status = 'CONNECTED' 
+        AND last_sync IS NOT NULL
+        AND (strftime('%s', 'now', 'localtime') - strftime('%s', last_sync)) > 35
+    `);
+
+    const rawDevices = await allQuery('SELECT * FROM devices ORDER BY last_sync DESC');
+    
+    // Dynamic status check
+    const devices = rawDevices.map(d => {
+      let isAlive = false;
+      if (d.last_sync) {
+        const lastSyncTime = new Date(d.last_sync).getTime();
+        const diffSec = (Date.now() - lastSyncTime) / 1000;
+        isAlive = !isNaN(diffSec) && diffSec < 35 && d.status !== 'DISCONNECTED';
+      }
+      return {
+        ...d,
+        status: isAlive ? 'CONNECTED' : 'DISCONNECTED'
+      };
+    });
+
     const localIp = getLocalIpAddresses();
     res.json({
       success: true,
@@ -710,6 +734,68 @@ app.get('/api/devices', async (req, res) => {
         status: 'LISTENING'
       }
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Periodic Watchdog: Broadcast status change if phone goes offline or battery dies
+setInterval(async () => {
+  try {
+    const timedOut = await allQuery(`
+      SELECT device_id, device_name 
+      FROM devices 
+      WHERE status = 'CONNECTED' 
+        AND last_sync IS NOT NULL
+        AND (strftime('%s', 'now', 'localtime') - strftime('%s', last_sync)) > 35
+    `);
+
+    if (timedOut && timedOut.length > 0) {
+      for (const d of timedOut) {
+        await runQuery(`UPDATE devices SET status = 'DISCONNECTED' WHERE device_id = ?`, [d.device_id]);
+        broadcast('DEVICE_STATUS_CHANGED', {
+          deviceId: d.device_id,
+          deviceName: d.device_name,
+          status: 'DISCONNECTED',
+          message: 'انقطع اتصال الهاتف بالمحل (الموبايل مغلق أو خرج من شبكة Wi-Fi)'
+        });
+      }
+    }
+  } catch (e) {}
+}, 8000);
+
+// Heartbeat Endpoint: Called by mobile foreground service every 12-15 seconds
+app.post('/api/devices/heartbeat', async (req, res) => {
+  try {
+    const deviceId = req.headers['x-device-id'] || req.body?.deviceId;
+    if (!deviceId) {
+      return res.status(400).json({ success: false, error: 'Device ID required' });
+    }
+
+    const deviceName = req.body?.deviceName || 'هاتف محمول (Android)';
+    const secret = req.headers['x-device-secret'] || 'sec_amn_companion_secret';
+
+    const updateRes = await runQuery(`
+      UPDATE devices 
+      SET last_sync = datetime('now', 'localtime'), status = 'CONNECTED'
+      WHERE device_id = ?
+    `, [deviceId]);
+
+    if (updateRes.changes === 0) {
+      await runQuery(`
+        INSERT INTO devices (device_id, device_name, device_ip, device_secret, auth_token, status, last_sync, total_messages, created_at)
+        VALUES (?, ?, ?, ?, ?, 'CONNECTED', datetime('now', 'localtime'), 0, datetime('now', 'localtime'))
+      `, [deviceId, deviceName, req.ip || '127.0.0.1', secret, secret]);
+    }
+
+    broadcast('DEVICE_STATUS_CHANGED', {
+      deviceId,
+      deviceName,
+      status: 'CONNECTED',
+      lastSync: new Date().toLocaleTimeString('ar-EG')
+    });
+
+    res.json({ success: true, timestamp: Date.now() });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

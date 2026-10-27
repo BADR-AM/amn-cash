@@ -12,39 +12,12 @@ import SmsSimulatorModal from './components/SmsSimulatorModal.jsx';
 import PhoneCompanionSidecar from './components/PhoneCompanionSidecar.jsx';
 import DownloadApkModal from './components/DownloadApkModal.jsx';
 
-// Web Audio Chime on new payment
-function playPaymentSound() {
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    const now = ctx.currentTime;
-    
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'triangle';
-    osc1.frequency.setValueAtTime(523.25, now);
-    gain1.gain.setValueAtTime(0.25, now);
-    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.2);
-
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(783.99, now + 0.12);
-    gain2.gain.setValueAtTime(0.3, now + 0.12);
-    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(now + 0.12);
-    osc2.stop(now + 0.45);
-  } catch (e) {
-    // Silent
-  }
-}
+import { 
+  playCashInSound, 
+  playCashOutSound, 
+  playDeviceDisconnectedSound, 
+  playDeviceConnectedSound 
+} from './utils/audioAlerts.js';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
@@ -69,8 +42,40 @@ export default function App() {
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
-  const [lastSync, setLastSync] = useState('منذ 10 ثواني');
+  const [lastSync, setLastSync] = useState('منذ ثوانٍ');
   const [toastNotification, setToastNotification] = useState(null);
+  
+  // Real-time Phone Connection Status (Connected / Disconnected / Offline)
+  const [phoneStatus, setPhoneStatus] = useState({
+    isConnected: false,
+    deviceName: 'لا يوجد هاتف متصل',
+    lastSync: 'غير متصل'
+  });
+
+  const fetchPhoneStatus = async () => {
+    try {
+      const res = await fetch('/api/devices');
+      const data = await res.json();
+      if (data.success && data.data.devices) {
+        const connectedDevice = data.data.devices.find(d => d.status === 'CONNECTED');
+        if (connectedDevice) {
+          setPhoneStatus({
+            isConnected: true,
+            deviceName: connectedDevice.device_name || 'هاتف Android',
+            lastSync: connectedDevice.last_sync || 'الآن'
+          });
+        } else {
+          setPhoneStatus({
+            isConnected: false,
+            deviceName: data.data.devices[0]?.device_name || 'لا يوجد هاتف',
+            lastSync: 'غير متصل (الموبايل مغلق)'
+          });
+        }
+      }
+    } catch (e) {
+      setPhoneStatus(prev => ({ ...prev, isConnected: false }));
+    }
+  };
 
   // Fetch initial data
   const fetchData = async () => {
@@ -95,7 +100,7 @@ export default function App() {
       }
 
       setIsOnline(true);
-      setLastSync('منذ 10 ثواني');
+      setLastSync('منذ ثوانٍ');
     } catch (err) {
       console.warn('Backend server connecting...');
     } finally {
@@ -105,6 +110,11 @@ export default function App() {
 
   useEffect(() => {
     fetchData();
+    fetchPhoneStatus();
+    
+    // Check phone live status periodically every 8s
+    const statusTimer = setInterval(fetchPhoneStatus, 8000);
+    return () => clearInterval(statusTimer);
   }, [period]);
 
   // Real-time SSE Connection
@@ -118,14 +128,50 @@ export default function App() {
           const msg = JSON.parse(event.data);
           if (msg.type === 'NEW_TRANSACTION') {
             fetchData();
-            playPaymentSound();
+            // Play financial audio alert according to transaction type!
+            if (msg.data.type === 'INCOMING') {
+              playCashInSound(); // Rich Ka-Ching / Cash register bell!
+            } else if (msg.data.type === 'WITHDRAWAL') {
+              playCashOutSound(); // 2-tone cash payout
+            } else {
+              playCashInSound(0.6);
+            }
+
             setToastNotification({
+              title: msg.data.type === 'INCOMING' ? '✓ تحويل وارد جديد' : '↑ عملية سحب جديدة',
               type: msg.data.type,
               amount: msg.data.amountEGP,
               phone: msg.data.senderOrRecipient,
               profit: msg.data.profitEGP
             });
-            setTimeout(() => setToastNotification(null), 5000);
+            setTimeout(() => setToastNotification(null), 6000);
+          } else if (msg.type === 'DEVICE_STATUS_CHANGED') {
+            if (msg.data.status === 'CONNECTED') {
+              playDeviceConnectedSound();
+              setPhoneStatus({
+                isConnected: true,
+                deviceName: msg.data.deviceName || 'هاتف Android',
+                lastSync: 'الآن'
+              });
+              setToastNotification({
+                title: '✓ هاتف المحل متصل الآن',
+                message: `تم ربط هاتف ${msg.data.deviceName || ''} بنجاح وجاهز لاستقبال التحويلات`,
+                type: 'SUCCESS'
+              });
+            } else if (msg.data.status === 'DISCONNECTED') {
+              playDeviceDisconnectedSound(); // Loud double warning beep!
+              setPhoneStatus(prev => ({
+                ...prev,
+                isConnected: false,
+                lastSync: 'غير متصل (مغلق)'
+              }));
+              setToastNotification({
+                title: '⚠️ تحذير: انقطع اتصال الهاتف بالمحل!',
+                message: msg.data.message || 'الهاتف غير متصل بالشبكة أو تم إغلاقه.',
+                type: 'WARNING'
+              });
+            }
+            setTimeout(() => setToastNotification(null), 6000);
           } else if (msg.type === 'TRANSACTION_UPDATED') {
             fetchData();
           } else if (msg.type === 'SETTINGS_UPDATED') {
@@ -202,6 +248,7 @@ export default function App() {
           onOpenDownloadModal={() => setIsDownloadModalOpen(true)}
           isOnline={isOnline}
           lastSync={lastSync}
+          phoneStatus={phoneStatus}
         />
 
         {/* Desktop Workspace */}
@@ -244,6 +291,8 @@ export default function App() {
             {currentTab === 'devices' && (
               <DevicesAndSync 
                 onOpenSimulator={() => setIsSimulatorOpen(true)}
+                phoneStatus={phoneStatus}
+                onRefreshPhoneStatus={fetchPhoneStatus}
               />
             )}
 

@@ -248,6 +248,59 @@ object WindowsApiClient {
         }
     }
 
+    // Periodic Heartbeat to tell Windows server the phone is alive
+    fun sendHeartbeat(context: Context, onResult: ((Boolean) -> Unit)? = null) {
+        val serverUrl = getServerUrl(context)
+        if (serverUrl.isBlank()) {
+            onResult?.invoke(false)
+            return
+        }
+
+        val deviceId = getDeviceId(context)
+        val deviceSecret = getDeviceSecret(context)
+
+        executor.execute {
+            var connection: HttpURLConnection? = null
+            var success = false
+            try {
+                val cleanBase = if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) {
+                    serverUrl.substringBefore("/api/")
+                } else {
+                    "http://${serverUrl.substringBefore("/api/")}"
+                }
+                val url = URL("$cleanBase/api/devices/heartbeat")
+                val payload = JSONObject().apply {
+                    put("deviceId", deviceId)
+                    put("deviceName", android.os.Build.MODEL ?: "هاتف Android")
+                }
+                val rawBody = payload.toString()
+
+                connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                    setRequestProperty("x-device-id", deviceId)
+                    setRequestProperty("x-device-secret", deviceSecret)
+                    connectTimeout = 4000
+                    readTimeout = 4000
+                    doOutput = true
+                }
+
+                OutputStreamWriter(connection.outputStream, "UTF-8").use {
+                    it.write(rawBody)
+                    it.flush()
+                }
+
+                val code = connection.responseCode
+                success = (code in 200..299)
+            } catch (e: Exception) {
+                // Offline
+            } finally {
+                connection?.disconnect()
+                mainHandler.post { onResult?.invoke(success) }
+            }
+        }
+    }
+
     // High Level: Enqueue Immediately + Attempt Instant Sync
     fun enqueueAndSyncMessage(context: Context, sender: String, text: String, onComplete: ((Boolean) -> Unit)? = null) {
         // Step 1: Write Ahead Log to disk
