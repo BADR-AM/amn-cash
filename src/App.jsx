@@ -210,12 +210,7 @@ export default function App() {
             {currentTab === 'dashboard' && (
               <Dashboard 
                 stats={stats}
-                recentTransactions={transactions.length > 0 ? transactions.slice(0, 6) : [
-                  { id: 1, timestamp: '14:32 - 2025/01/26', senderOrRecipient: '01012345678', type: 'INCOMING', amountEGP: 2000, feeEGP: 100, costEGP: 20, profitEGP: 80 },
-                  { id: 2, timestamp: '12:10 - 2025/01/26', senderOrRecipient: '01198765432', type: 'INCOMING', amountEGP: 1000, feeEGP: 50, costEGP: 10, profitEGP: 40 },
-                  { id: 3, timestamp: '10:03 - 2025/01/26', senderOrRecipient: '01055566777', type: 'WITHDRAWAL', amountEGP: 5000, feeEGP: 0, costEGP: 0, profitEGP: 0 },
-                  { id: 4, timestamp: '09:15 - 2025/01/26', senderOrRecipient: '01033445566', type: 'INCOMING', amountEGP: 3000, feeEGP: 150, costEGP: 30, profitEGP: 120 },
-                ]}
+                recentTransactions={transactions.slice(0, 6)}
                 onNavigateToTransactions={() => setCurrentTab('transactions')}
                 period={period}
                 setPeriod={setPeriod}
@@ -226,13 +221,7 @@ export default function App() {
 
             {currentTab === 'transactions' && (
               <Transactions 
-                transactions={transactions.length > 0 ? transactions : [
-                  { id: 1, timestamp: '2024/11/20 14:35', senderOrRecipient: 'أحمد محمد', type: 'INCOMING', amountEGP: 5000, feeEGP: 250, costEGP: 50, profitEGP: 200 },
-                  { id: 2, timestamp: '2024/11/20 12:10', senderOrRecipient: 'محمود علي', type: 'INCOMING', amountEGP: 3000, feeEGP: 150, costEGP: 30, profitEGP: 120 },
-                  { id: 3, timestamp: '2024/11/19 18:42', senderOrRecipient: 'سارة إبراهيم', type: 'INCOMING', amountEGP: 1000, feeEGP: 50, costEGP: 10, profitEGP: 40 },
-                  { id: 4, timestamp: '2024/11/19 16:20', senderOrRecipient: 'محمد السيد', type: 'INCOMING', amountEGP: 2000, feeEGP: 100, costEGP: 20, profitEGP: 80 },
-                  { id: 5, timestamp: '2024/11/18 11:30', senderOrRecipient: 'هالة أحمد', type: 'INCOMING', amountEGP: 4000, feeEGP: 200, costEGP: 40, profitEGP: 160 },
-                ]}
+                transactions={transactions}
                 settings={settings}
                 onRefresh={fetchData}
                 onNavigateToFees={() => setCurrentTab('fees')}

@@ -3,6 +3,11 @@ package com.amn.cash.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.PowerManager
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.Telephony
 import android.util.Log
 import com.amn.cash.network.WindowsApiClient
@@ -67,17 +72,58 @@ class VodafoneSmsReceiver : BroadcastReceiver() {
                 text.contains("Vodafone Cash", ignoreCase = true) ||
                 text.contains("محفظتك", ignoreCase = true) ||
                 text.contains("رصيدك الحالي", ignoreCase = true) ||
+                text.contains("رصيدك", ignoreCase = true) ||
                 text.contains("تم استلام", ignoreCase = true) ||
                 text.contains("تم إيداع", ignoreCase = true) ||
                 text.contains("إيداع", ignoreCase = true) ||
                 text.contains("تم تحويل", ignoreCase = true) ||
+                text.contains("تحويل", ignoreCase = true) ||
                 text.contains("سحب نقدي", ignoreCase = true) ||
                 text.contains("مصاريف السحب", ignoreCase = true) ||
-                (text.contains("جنيه") && text.contains("رقم العملية"))
+                (text.contains("جنيه") && text.contains("العملية"))
 
         if (isSenderVodafone || isVodafoneCashText) {
-            Log.i(TAG, "Valid Vodafone Cash financial SMS detected! Sending to Windows PC...")
-            WindowsApiClient.sendSmsEvent(context, text, sender.ifEmpty { "VF-Cash" })
+            Log.i(TAG, "Valid Vodafone Cash financial SMS detected! Enqueueing & Syncing...")
+
+            // Haptic notification (vibrate)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                    vm?.defaultVibrator?.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    val v = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        v?.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        v?.vibrate(300)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Vibrate error: ${e.message}")
+            }
+
+            // PowerManager WakeLock: hold CPU for 15 seconds to finish queue write & network send
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AMNCash:SmsReceiverWakeLock")
+            wakeLock?.acquire(15000)
+
+            val pendingResult = goAsync()
+
+            WindowsApiClient.enqueueAndSyncMessage(
+                context = context,
+                sender = sender.ifEmpty { "VF-Cash" },
+                text = text
+            ) { success ->
+                Log.i(TAG, "SMS Processed with status: success=$success")
+                try {
+                    wakeLock?.release()
+                } catch (e: Exception) {}
+                try {
+                    pendingResult.finish()
+                } catch (e: Exception) {}
+            }
         } else {
             Log.d(TAG, "Ignored SMS: not a Vodafone Cash transaction.")
         }

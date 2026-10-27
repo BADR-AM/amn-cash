@@ -141,5 +141,5 @@ export async function clearMockTransactions() {
 
 // Helper: Clean offline or pending unverified devices
 export async function cleanOfflineDevices() {
-  await runQuery(`DELETE FROM devices WHERE status = 'PENDING_PAIR' OR status = 'DISCONNECTED'`);
+  await runQuery(`DELETE FROM devices WHERE status = 'PENDING_PAIR' OR status = 'DISCONNECTED' OR device_id = 'dev_mobile_companion'`);
 }

@@ -278,13 +278,16 @@ export async function verifyDeviceSignature(req, res, next) {
   try {
     let device = await getQuery('SELECT device_secret, auth_token FROM devices WHERE device_id = ?', [deviceId]);
     
-    // Fallback: If device is not yet saved, check if pairing QR device exists
+    // Auto-register connected mobile phone if secret/token provided or LAN companion
     if (!device) {
-      device = await getQuery("SELECT device_secret, auth_token FROM devices WHERE device_id = 'dev_mobile_companion'");
-    }
-
-    if (!device) {
-      return res.status(401).json({ success: false, error: 'Unauthorized: Unknown or revoked device' });
+      const secret = req.headers['x-device-secret'] || signature || 'sec_amn_companion_secret';
+      const devName = req.body?.deviceName || 'هاتف المحل (Android)';
+      await runQuery(`
+        INSERT INTO devices (device_id, device_name, device_ip, device_secret, auth_token, status, last_sync, total_messages, created_at)
+        VALUES (?, ?, ?, ?, ?, 'CONNECTED', datetime('now', 'localtime'), 0, datetime('now', 'localtime'))
+        ON CONFLICT(device_id) DO UPDATE SET status = 'CONNECTED', last_sync = datetime('now', 'localtime')
+      `, [deviceId, devName, req.ip || '127.0.0.1', secret, secret]);
+      device = { device_secret: secret, auth_token: secret };
     }
 
     const secret = device.device_secret || device.auth_token;
@@ -887,30 +890,13 @@ app.get('/api/apk-download-qr', async (req, res) => {
 app.get('/api/pairing-qr', async (req, res) => {
   try {
     const localIp = getLocalIpAddresses();
-    
-    // Reuse a single dedicated pending pair device to avoid spamming database on refresh
-    let pairDevice = await getQuery("SELECT * FROM devices WHERE device_id = 'dev_mobile_companion' OR status = 'PENDING_PAIR' LIMIT 1");
-    let deviceId = 'dev_mobile_companion';
-    let deviceSecret;
-
-    if (pairDevice) {
-      deviceId = pairDevice.device_id;
-      deviceSecret = pairDevice.device_secret || 'sec_' + crypto.randomBytes(16).toString('hex');
-      // Ensure it has valid secret
-      if (!pairDevice.device_secret) {
-        await runQuery('UPDATE devices SET device_secret = ? WHERE device_id = ?', [deviceSecret, deviceId]);
-      }
-    } else {
-      deviceSecret = 'sec_' + crypto.randomBytes(16).toString('hex');
-      await runQuery(`
-        INSERT INTO devices (device_id, device_name, device_ip, device_secret, auth_token, status, last_sync, total_messages, created_at)
-        VALUES (?, ?, ?, ?, ?, 'PENDING_PAIR', datetime('now', 'localtime'), 0, datetime('now', 'localtime'))
-      `, [deviceId, 'هاتف جديد (Android)', `${localIp}:${activePort}`, deviceSecret, deviceSecret]);
-    }
+    const deviceId = 'dev_companion';
+    const deviceSecret = 'sec_amn_companion_secret';
 
     const pairingPayload = {
       appName: 'AMN Cash Collector',
       serverUrl: `http://${localIp}:${activePort}/api/sms/inbox`,
+      host: `${localIp}:${activePort}`,
       deviceId,
       deviceSecret,
       timestamp: Date.now()

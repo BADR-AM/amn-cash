@@ -3,7 +3,6 @@ package com.amn.cash
 import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -11,6 +10,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -29,10 +29,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
-import com.amn.cash.network.SmsLogItem
+import com.amn.cash.network.SmsMessageItem
 import com.amn.cash.network.WindowsApiClient
 import com.amn.cash.service.CollectorForegroundService
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -48,7 +49,7 @@ class MainActivity : ComponentActivity() {
         if (smsGranted) {
             Toast.makeText(this, "تم تفعيل أذونات الرسائل بنجاح", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(this, "يرجى منح إذن الرسائل ليعمل التطبيق", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "يرجى منح إذن الرسائل ليعمل التطبيق في المحل", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -90,7 +91,8 @@ class MainActivity : ComponentActivity() {
     private fun requestSmsPermissions() {
         val perms = mutableListOf(
             Manifest.permission.RECEIVE_SMS,
-            Manifest.permission.READ_SMS
+            Manifest.permission.READ_SMS,
+            Manifest.permission.CAMERA
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             perms.add(Manifest.permission.POST_NOTIFICATIONS)
@@ -127,15 +129,54 @@ fun AMNCollectorApp(
     var totalSentCount by remember { mutableStateOf(WindowsApiClient.getTotalSent(context)) }
     var pingStatus by remember { mutableStateOf<String?>(null) }
     var isPinging by remember { mutableStateOf(false) }
-    var logs by remember { mutableStateOf(WindowsApiClient.getLogs(context)) }
+    var isFlushing by remember { mutableStateOf(false) }
+    var messagesList by remember { mutableStateOf(WindowsApiClient.getAllMessages(context)) }
+    val pendingCount = messagesList.count { it.status != "SYNCED" }
 
-    val refreshLogs = {
-        logs = WindowsApiClient.getLogs(context)
+    val refreshData = {
+        messagesList = WindowsApiClient.getAllMessages(context)
         totalSentCount = WindowsApiClient.getTotalSent(context)
+        serverUrl = WindowsApiClient.getServerUrl(context)
+    }
+
+    // Auto refresh periodically when on screen
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(4000)
+            refreshData()
+        }
+    }
+
+    // QR Code Scanner Launcher using ZXing ScanContract
+    val qrScannerLauncher = rememberLauncherForActivityResult(contract = ScanContract()) { result ->
+        val contents = result.contents
+        if (!contents.isNullOrBlank()) {
+            Toast.makeText(context, "جاري قراءة كود الربط...", Toast.LENGTH_SHORT).show()
+            WindowsApiClient.parseQrAndPair(context, contents) { ok, msg ->
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                if (ok) {
+                    refreshData()
+                    CollectorForegroundService.startService(context)
+                    isServiceRunning = true
+                    currentStep = 4
+                }
+            }
+        }
+    }
+
+    val launchQrScanner = {
+        val options = ScanOptions().apply {
+            setPrompt("وجّه الكاميرا نحو كود الربط في شاشة برنامج الويندوز")
+            setBeepEnabled(true)
+            setOrientationLocked(false)
+            setBarcodeImageEnabled(false)
+        }
+        qrScannerLauncher.launch(options)
     }
 
     val vodaRed = Color(0xFFCA1535)
     val vodaGreen = Color(0xFF10895C)
+    val warningOrange = Color(0xFFD97706)
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -173,7 +214,7 @@ fun AMNCollectorApp(
                             color = Color(0xFF1E293B)
                         )
                         Text(
-                            text = "نظام المزامنة المباشرة مع الكمبيوتر",
+                            text = "طابور المزامنة التلقائي للرسائل المالية",
                             fontSize = 10.sp,
                             color = Color.Gray
                         )
@@ -181,13 +222,18 @@ fun AMNCollectorApp(
                 }
 
                 if (currentStep == 4) {
-                    TextButton(onClick = { currentStep = 3 }) {
-                        Text("⚙️ ضبط الـ IP", fontSize = 11.sp, color = vodaRed, fontWeight = FontWeight.Bold)
+                    Row {
+                        IconButton(onClick = { launchQrScanner() }) {
+                            Text("📷", fontSize = 18.sp)
+                        }
+                        TextButton(onClick = { currentStep = 3 }) {
+                            Text("⚙️ ضبط IP", fontSize = 11.sp, color = vodaRed, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             // Main Content Area by Step
             Box(
@@ -226,7 +272,7 @@ fun AMNCollectorApp(
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "تطبيق مساعد لالتقاط رسائل فودافون كاش ومزامنتها لحظياً مع حاسوب الويندوز على نفس شبكة الـ Wi-Fi.",
+                                    text = "تطبيق التقاط ومزامنة رسائل فودافون كاش مع كمبيوتر الويندوز بطابور فوري آمن يمنع ضياع أي معاملة.",
                                     fontSize = 12.sp,
                                     color = Color(0xFF68748A),
                                     textAlign = TextAlign.Center,
@@ -260,14 +306,14 @@ fun AMNCollectorApp(
                                 Text("🔒", fontSize = 32.sp)
                                 Spacer(modifier = Modifier.height(12.dp))
                                 Text(
-                                    text = "تفعيل أذونات الرسائل",
+                                    text = "تفعيل الأذونات الضرورية",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF192336)
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "يتطلب التطبيق إذن قراءة واستقبال الرسائل للتعرف على معاملات فودافون كاش فور وصولها. يتم تجاهل أي رسائل خاصة أو رموز سرية OTP فورياً.",
+                                    text = "يتطلب التطبيق إذن الرسائل لقراءة تحويلات فودافون كاش، وإذن الكاميرا لمسح كود الربط. يتم إسقاط أي رموز سرية OTP فورياً.",
                                     fontSize = 12.sp,
                                     color = Color(0xFF68748A),
                                     textAlign = TextAlign.Center,
@@ -283,14 +329,14 @@ fun AMNCollectorApp(
                                     shape = RoundedCornerShape(14.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("منح أذونات الرسائل (SMS)", fontWeight = FontWeight.Bold)
+                                    Text("منح الأذونات والانتقال للربط", fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                     }
 
                     3 -> {
-                        // Step 3: Server Address / Pair
+                        // Step 3: Server Address / Pair via Camera Scan OR Manual IP
                         Card(
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -301,22 +347,37 @@ fun AMNCollectorApp(
                                 modifier = Modifier.padding(24.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text("💻", fontSize = 32.sp)
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Text("📷", fontSize = 36.sp)
+                                Spacer(modifier = Modifier.height(10.dp))
                                 Text(
-                                    text = "الربط بحاسوب الويندوز",
+                                    text = "ربط الهاتف بحاسوب الويندوز",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF192336)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = "أدخل عنوان IP الكمبيوتر المعروض في شاشة (الأجهزة والاتصال) ببرنامج الكمبيوتر:",
+                                    text = "امسح كود الـ QR المعروض في شاشة (الأجهزة والاتصال) بالكمبيوتر بالكاميرا مباشرة:",
                                     fontSize = 12.sp,
                                     color = Color(0xFF68748A),
                                     textAlign = TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
+
+                                // Big Camera QR Scan Button
+                                Button(
+                                    onClick = { launchQrScanner() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = vodaRed),
+                                    shape = RoundedCornerShape(14.dp),
+                                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                                ) {
+                                    Text("📷 فتح الكاميرا لمسح الكود (QR Scan)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Text("أو أدخل عنوان IP الكمبيوتر يدوياً:", fontSize = 11.sp, color = Color.Gray)
+                                Spacer(modifier = Modifier.height(8.dp))
+
                                 OutlinedTextField(
                                     value = manualIpInput,
                                     onValueChange = { manualIpInput = it },
@@ -324,8 +385,8 @@ fun AMNCollectorApp(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(12.dp)
                                 )
-                                Spacer(modifier = Modifier.height(20.dp))
-                                Button(
+                                Spacer(modifier = Modifier.height(12.dp))
+                                OutlinedButton(
                                     onClick = {
                                         val ipClean = manualIpInput.trim()
                                         val target = if (ipClean.contains(":")) ipClean else "$ipClean:5500"
@@ -335,27 +396,26 @@ fun AMNCollectorApp(
                                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                         }
 
-                                        WindowsApiClient.savePairing(context, fullUrl, "dev_mobile_companion", "sec_amn_companion_secret")
+                                        WindowsApiClient.savePairing(context, fullUrl, WindowsApiClient.getDeviceId(context), WindowsApiClient.getDeviceSecret(context))
                                         serverUrl = fullUrl
                                         CollectorForegroundService.startService(context)
                                         isServiceRunning = true
                                         currentStep = 4
                                     },
-                                    colors = ButtonDefaults.buttonColors(containerColor = vodaRed),
                                     shape = RoundedCornerShape(14.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("حفظ والاتصال الآن", fontWeight = FontWeight.Bold)
+                                    Text("اتصال يدوي بالـ IP", fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                     }
 
                     4 -> {
-                        // Step 4: Active Running Dashboard with Live Log & Ping & Safe Test
+                        // Step 4: Active Running Dashboard with Live Outbox Queue & Auto-Retry
                         Column(
                             modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             // 1. Connection Card
                             Card(
@@ -364,7 +424,7 @@ fun AMNCollectorApp(
                                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
+                                Column(modifier = Modifier.padding(14.dp)) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -378,7 +438,7 @@ fun AMNCollectorApp(
                                             )
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = if (isServiceRunning) "الخدمة نشطة وجاهزة للاستقبال" else "الخدمة متوقفة مؤقتاً",
+                                                text = if (isServiceRunning) "الخدمة نشطة وطابور المزامنة يعمل" else "الخدمة متوقفة مؤقتاً",
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.sp,
                                                 color = if (isServiceRunning) vodaGreen else Color.Red
@@ -401,13 +461,13 @@ fun AMNCollectorApp(
                                             ),
                                             shape = RoundedCornerShape(10.dp),
                                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                            modifier = Modifier.height(32.dp)
+                                            modifier = Modifier.height(30.dp)
                                         ) {
                                             Text(if (isServiceRunning) "إيقاف" else "تشغيل", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
 
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(6.dp))
                                     Text(
                                         text = "الكمبيوتر: ${serverUrl.substringBefore("/api/").ifEmpty { "غير محدد" }}",
                                         fontSize = 11.sp,
@@ -416,18 +476,55 @@ fun AMNCollectorApp(
                                     )
 
                                     if (pingStatus != null) {
-                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = pingStatus ?: "",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (pingStatus?.contains("بنجاح") == true) vodaGreen else Color(0xFFD97706)
+                                            color = if (pingStatus?.contains("بنجاح") == true) vodaGreen else warningOrange
                                         )
                                     }
                                 }
                             }
 
-                            // 2. Counters Row
+                            // 2. Alert Banner if there are pending unsynced messages!
+                            if (pendingCount > 0) {
+                                Card(
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
+                                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(Color(0xFFF59E0B))),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("⚠️ تنبيه: رسائل معلقة في الطابور", fontWeight = FontWeight.Black, fontSize = 12.sp, color = Color(0xFF92400E))
+                                            Text("يوجد $pendingCount رسالة لم تصل للكمبيوتر بعد. جاري إعادة المحاولة تلقائياً.", fontSize = 10.sp, color = Color(0xFFB45309))
+                                        }
+                                        Button(
+                                            onClick = {
+                                                isFlushing = true
+                                                WindowsApiClient.flushOutbox(context) { s, f ->
+                                                    isFlushing = false
+                                                    refreshData()
+                                                    Toast.makeText(context, "تم إرسال $s معلقة | فشل $f", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Text(if (isFlushing) "جاري..." else "إرسال الآن 🔄", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 3. Status Counters
                             Card(
                                 shape = RoundedCornerShape(18.dp),
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -437,78 +534,101 @@ fun AMNCollectorApp(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(14.dp),
+                                        .padding(12.dp),
                                     horizontalArrangement = Arrangement.SpaceEvenly
                                 ) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("إجمالي الرسائل", fontSize = 10.sp, color = Color.Gray)
-                                        Text(text = "$totalSentCount", fontSize = 20.sp, fontWeight = FontWeight.Black)
+                                        Text("إجمالي الملتقط", fontSize = 10.sp, color = Color.Gray)
+                                        Text(text = "${messagesList.size}", fontSize = 18.sp, fontWeight = FontWeight.Black)
                                     }
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("المزامنة للكمبيوتر", fontSize = 10.sp, color = Color.Gray)
-                                        Text(text = "$totalSentCount", fontSize = 20.sp, fontWeight = FontWeight.Black, color = vodaGreen)
+                                        Text("مؤكد بالكمبيوتر ✓", fontSize = 10.sp, color = Color.Gray)
+                                        Text(text = "${messagesList.count { it.status == "SYNCED" }}", fontSize = 18.sp, fontWeight = FontWeight.Black, color = vodaGreen)
                                     }
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("سجل الهاتف", fontSize = 10.sp, color = Color.Gray)
-                                        Text(text = "${logs.size}", fontSize = 20.sp, fontWeight = FontWeight.Black, color = Color.DarkGray)
+                                        Text("معلق بالطابور ⏳", fontSize = 10.sp, color = Color.Gray)
+                                        Text(text = "$pendingCount", fontSize = 18.sp, fontWeight = FontWeight.Black, color = if (pendingCount > 0) warningOrange else Color.Gray)
                                     }
                                 }
                             }
 
-                            // 3. Quick Action Buttons
+                            // 4. Action Buttons
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // Test SMS button (Completely Safe, No Crash!)
+                                // Flush Queue button
                                 Button(
                                     onClick = {
+                                        isFlushing = true
+                                        WindowsApiClient.flushOutbox(context) { s, f ->
+                                            isFlushing = false
+                                            refreshData()
+                                            Toast.makeText(context, "تم إرسال $s معلقة | فشل $f", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = if (pendingCount > 0) warningOrange else Color(0xFF1E293B)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f).height(42.dp)
+                                ) {
+                                    Text(if (isFlushing) "جاري الإرسال..." else "🔄 إرسال المعلقات ($pendingCount)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                // Test SMS button (Completely Safe, Added to Outbox Queue)
+                                OutlinedButton(
+                                    onClick = {
                                         val testSms = "تم استلام مبلغ 1,000.00 جنيه من 01012345678 رصيدك الحالي هو 15,000.00 جنيه رقم العملية ${System.currentTimeMillis().toString().takeLast(6)}"
-                                        Toast.makeText(context, "جاري إرسال الرسالة للكمبيوتر...", Toast.LENGTH_SHORT).show()
-                                        WindowsApiClient.sendSmsEvent(context, testSms, "VF-Cash") { ok ->
-                                            refreshLogs()
+                                        Toast.makeText(context, "تم تسجيل الرسالة في الطابور وجاري إرسالها للكمبيوتر...", Toast.LENGTH_SHORT).show()
+                                        WindowsApiClient.enqueueAndSyncMessage(context, "VF-Cash", testSms) { ok ->
+                                            refreshData()
                                             if (ok) {
-                                                Toast.makeText(context, "✓ تم وصول الرسالة للكمبيوتر وتسجيلها!", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "✓ تم تأكيد استلام الرسالة بالكمبيوتر فوراً!", Toast.LENGTH_SHORT).show()
                                             } else {
-                                                Toast.makeText(context, "فشل الاتصال! تأكد أن الكمبيوتر والموبايل على نفس الـ Wi-Fi", Toast.LENGTH_LONG).show()
+                                                Toast.makeText(context, "حُفظت الرسالة في الطابور المحلي وسترسل تلقائياً فور توفر الاتصال.", Toast.LENGTH_LONG).show()
                                             }
                                         }
                                     },
-                                    colors = ButtonDefaults.buttonColors(containerColor = vodaRed),
                                     shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.weight(1f).height(44.dp)
+                                    modifier = Modifier.weight(1f).height(42.dp)
                                 ) {
-                                    Text("فحص استقبال رسالة VF-Cash", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("📩 تجربة تحويل فودافون", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
 
-                                // Ping server button
-                                OutlinedButton(
+                                // Ping Server
+                                IconButton(
                                     onClick = {
                                         isPinging = true
                                         pingStatus = "جاري الفحص..."
-                                        WindowsApiClient.pingServer(context) { ok, msg ->
+                                        WindowsApiClient.pingServer(context) { _, msg ->
                                             isPinging = false
                                             pingStatus = msg
                                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                         }
                                     },
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.weight(1f).height(44.dp)
+                                    modifier = Modifier.size(42.dp)
                                 ) {
-                                    Text(if (isPinging) "جاري الفحص..." else "🔄 اختبار الاتصال", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("📶", fontSize = 18.sp)
                                 }
                             }
 
-                            // 4. Intercepted SMS Activity Log (سجل الرسائل الملتقطة)
-                            Text(
-                                text = "سجل الرسائل الملتقطة مؤخراً:",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1E293B),
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
+                            // 5. Intercepted SMS Outbox Log (سجل الطابور والرسائل)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "طابور وسجل الرسائل الملتقطة:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1E293B)
+                                )
+                                TextButton(onClick = { refreshData() }) {
+                                    Text("تحديث ↻", fontSize = 10.sp, color = vodaRed)
+                                }
+                            }
 
-                            if (logs.isEmpty()) {
+                            if (messagesList.isEmpty()) {
                                 Card(
                                     shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -529,7 +649,7 @@ fun AMNCollectorApp(
                                             )
                                             Spacer(modifier = Modifier.height(4.dp))
                                             Text(
-                                                text = "بمجرد وصول أي رسالة من فودافون كاش على الشريحة سيتم تسجيلها وإرسالها للكمبيوتر فوراً.",
+                                                text = "بمجرد وصول أي رسالة من فودافون كاش على الشريحة سيتم حفظها محلياً فوراً ومزامنتها مع الكمبيوتر.",
                                                 fontSize = 10.sp,
                                                 color = Color.LightGray,
                                                 textAlign = TextAlign.Center
@@ -542,10 +662,14 @@ fun AMNCollectorApp(
                                     modifier = Modifier.fillMaxWidth().weight(1f),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    items(logs) { item ->
+                                    items(messagesList) { item ->
+                                        val isSynced = item.status == "SYNCED"
+                                        val timeStr = SimpleDateFormat("HH:mm:ss dd/MM", Locale.getDefault()).format(Date(item.timestamp))
+
                                         Card(
                                             shape = RoundedCornerShape(14.dp),
                                             colors = CardDefaults.cardColors(containerColor = Color.White),
+                                            border = if (!isSynced) CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(warningOrange)) else null,
                                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
@@ -555,41 +679,67 @@ fun AMNCollectorApp(
                                                     horizontalArrangement = Arrangement.SpaceBetween,
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    Text(
-                                                        text = item.sender,
-                                                        fontWeight = FontWeight.Black,
-                                                        fontSize = 11.sp,
-                                                        color = vodaRed
-                                                    )
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(8.dp)
+                                                                .background(if (isSynced) vodaGreen else warningOrange, CircleShape)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text(
+                                                            text = item.sender,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 11.sp,
+                                                            color = Color(0xFF1E293B)
+                                                        )
+                                                    }
 
-                                                    val timeStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(item.timestamp))
-                                                    Text(
-                                                        text = timeStr,
-                                                        fontSize = 10.sp,
-                                                        color = Color.Gray
-                                                    )
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(
+                                                            text = timeStr,
+                                                            fontSize = 9.sp,
+                                                            color = Color.Gray
+                                                        )
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        if (isSynced) {
+                                                            Text(
+                                                                text = "✓ تم التأكيد بالكمبيوتر",
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = vodaGreen
+                                                            )
+                                                        } else {
+                                                            Button(
+                                                                onClick = {
+                                                                    WindowsApiClient.triggerBackgroundQueueFlush(context)
+                                                                    Toast.makeText(context, "جاري إعادة إرسال المعلقة...", Toast.LENGTH_SHORT).show()
+                                                                },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFEF3C7), contentColor = Color(0xFF92400E)),
+                                                                shape = RoundedCornerShape(8.dp),
+                                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                                modifier = Modifier.height(26.dp)
+                                                            ) {
+                                                                Text("⏳ معلق (إعادة الإرسال)", fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+                                                    }
                                                 }
 
-                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Spacer(modifier = Modifier.height(6.dp))
                                                 Text(
                                                     text = item.text,
-                                                    fontSize = 11.sp,
-                                                    color = Color(0xFF334155),
-                                                    lineHeight = 16.sp
+                                                    fontSize = 10.sp,
+                                                    lineHeight = 14.sp,
+                                                    color = Color(0xFF334155)
                                                 )
 
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.End
-                                                ) {
-                                                    val statusText = if (item.success) "✓ تم الإرسال للكمبيوتر" else "❌ فشل الإرسال"
-                                                    val statusColor = if (item.success) vodaGreen else Color.Red
+                                                if (!isSynced && !item.errorMessage.isNullOrBlank()) {
+                                                    Spacer(modifier = Modifier.height(4.dp))
                                                     Text(
-                                                        text = statusText,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = statusColor
+                                                        text = "سبب التعليق: ${item.errorMessage}",
+                                                        fontSize = 8.sp,
+                                                        color = Color(0xFFDC2626),
+                                                        fontWeight = FontWeight.Medium
                                                     )
                                                 }
                                             }
@@ -601,14 +751,6 @@ fun AMNCollectorApp(
                     }
                 }
             }
-
-            // Footer note
-            Text(
-                text = "AMN Cash • تشفير محلي 100% بدون أي خوادم سحابية",
-                fontSize = 10.sp,
-                color = Color(0xFF94A3B8),
-                modifier = Modifier.padding(top = 8.dp)
-            )
         }
     }
 }

@@ -321,7 +321,14 @@ export default function Dashboard({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
-              {recentTransactions.map((tx) => {
+              {recentTransactions.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400 text-xs font-semibold">
+                    لا توجد معاملات مسجلة بعد — بانتظار استقبال رسائل فودافون كاش أو إضافة معاملة يدوية.
+                  </td>
+                </tr>
+              ) : (
+                recentTransactions.map((tx) => {
                 const isIncoming = tx.type === 'INCOMING';
                 const payoutEGP = tx.beneficiaryPayoutEGP !== undefined
                   ? tx.beneficiaryPayoutEGP
@@ -427,7 +434,7 @@ export default function Dashboard({
 
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>
