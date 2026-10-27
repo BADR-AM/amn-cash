@@ -3,7 +3,15 @@ const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
 
+// 1. Single Instance Protection: Prevent multiple app/server instances from colliding
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+  process.exit(0);
+}
+
 let mainWindow;
+let serverModule;
 
 async function startBackendServer() {
   const isDev = !app.isPackaged;
@@ -17,10 +25,13 @@ async function startBackendServer() {
 
   try {
     const serverPath = path.join(__dirname, '../server/server.js');
-    await import(pathToFileURL(serverPath).href);
-    console.log('✓ AMN Cash internal backend started inside Electron process');
+    serverModule = await import(pathToFileURL(serverPath).href);
+    const activePort = serverModule.getActivePort ? serverModule.getActivePort() : (process.env.ACTIVE_PORT || 5500);
+    console.log(`✓ AMN Cash backend ready on port ${activePort} (isolated from other systems)`);
+    return activePort;
   } catch (err) {
     console.error('Failed to import backend server directly:', err);
+    return 5500;
   }
 }
 
@@ -67,23 +78,27 @@ function createWindow() {
     }
   });
 
+  const activePort = (serverModule && serverModule.getActivePort) 
+    ? serverModule.getActivePort() 
+    : (process.env.ACTIVE_PORT || 5500);
+
   const devUrl = process.env.ELECTRON_START_URL || 'http://localhost:5174';
 
   if (isDev && process.env.ELECTRON_START_URL) {
     mainWindow.loadURL(devUrl);
   } else {
-    // In production, poll until embedded server is ready, then load seamlessly
+    // In production, connect directly to our isolated internal server
     const http = require('http');
     let attempts = 0;
     const maxAttempts = 30; // up to 6s
 
     const checkServer = () => {
       attempts++;
-      http.get('http://localhost:5500/api/settings', (res) => {
-        mainWindow.loadURL('http://localhost:5500');
+      http.get(`http://localhost:${activePort}/api/settings`, (res) => {
+        mainWindow.loadURL(`http://localhost:${activePort}`);
       }).on('error', () => {
         if (attempts < maxAttempts) {
-          setTimeout(checkServer, 200);
+          setTimeout(checkServer, 150);
         } else {
           mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
         }
@@ -98,6 +113,14 @@ function createWindow() {
   });
 }
 
+// Focus existing window if user clicks shortcut again
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
 app.whenReady().then(async () => {
   await startBackendServer();
   createWindow();
@@ -110,5 +133,14 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+// Clean Port Release on Quit
+app.on('before-quit', async () => {
+  if (serverModule && typeof serverModule.stopServer === 'function') {
+    try {
+      await serverModule.stopServer();
+    } catch {}
   }
 });

@@ -494,6 +494,12 @@ function getApkFilePath() {
   return null;
 }
 
+export let activePort = parseInt(process.env.PORT, 10) || 5500;
+
+export function getActivePort() {
+  return activePort;
+}
+
 // 6. Devices and Pairing QR Code
 app.get('/api/devices', async (req, res) => {
   try {
@@ -503,7 +509,7 @@ app.get('/api/devices', async (req, res) => {
       success: true,
       data: {
         devices,
-        serverHost: `${localIp}:5500`,
+        serverHost: `${localIp}:${activePort}`,
         status: 'LISTENING'
       }
     });
@@ -515,7 +521,7 @@ app.get('/api/devices', async (req, res) => {
 // Interactive Mobile Portal for Phone Browsers via QR Code: Choose between Download or Pair
 app.get(['/connect', '/download-app'], async (req, res) => {
   const localIp = getLocalIpAddresses();
-  const serverUrl = `http://${localIp}:5500`;
+  const serverUrl = `http://${localIp}:${activePort}`;
   const deepLink = `amncash://pair?server=${encodeURIComponent(serverUrl)}`;
 
   const html = `<!DOCTYPE html>
@@ -655,8 +661,8 @@ app.get('/api/download/apk', (req, res) => {
 app.get('/api/apk-download-qr', async (req, res) => {
   try {
     const localIp = getLocalIpAddresses();
-    const downloadPageUrl = `http://${localIp}:5500/download-app`;
-    const apkDirectUrl = `http://${localIp}:5500/api/download/apk`;
+    const downloadPageUrl = `http://${localIp}:${activePort}/connect`;
+    const apkDirectUrl = `http://${localIp}:${activePort}/api/download/apk`;
     const apkPath = getApkFilePath();
 
     const qrDataUrl = await QRCode.toDataURL(downloadPageUrl, {
@@ -695,11 +701,11 @@ app.get('/api/pairing-qr', async (req, res) => {
       INSERT INTO devices (device_id, device_name, device_ip, device_secret, auth_token, status, last_sync, total_messages, created_at)
       VALUES (?, ?, ?, ?, ?, 'PENDING_PAIR', datetime('now', 'localtime'), 0, datetime('now', 'localtime'))
       ON CONFLICT(device_id) DO UPDATE SET device_secret = excluded.device_secret
-    `, [newDeviceId, 'هاتف جديد (Android)', `${localIp}:5500`, newDeviceSecret, newDeviceSecret]);
+    `, [newDeviceId, 'هاتف جديد (Android)', `${localIp}:${activePort}`, newDeviceSecret, newDeviceSecret]);
 
     const pairingPayload = {
       appName: 'AMN Cash Collector',
-      serverUrl: `http://${localIp}:5500/api/sms/inbox`,
+      serverUrl: `http://${localIp}:${activePort}/api/sms/inbox`,
       deviceId: newDeviceId,
       deviceSecret: newDeviceSecret,
       timestamp: Date.now()
@@ -718,7 +724,7 @@ app.get('/api/pairing-qr', async (req, res) => {
       success: true,
       data: {
         qrCode: qrDataUrl,
-        serverAddress: `${localIp}:5500`,
+        serverAddress: `${localIp}:${activePort}`,
         pairingPayload
       }
     });
@@ -773,21 +779,68 @@ if (fs.existsSync(distPath)) {
 }
 
 // -----------------------------------------------------------------------------
-// Initialize and Start Server
+// Safe Dynamic Port Binding (No Conflict With Other Local Systems)
 // -----------------------------------------------------------------------------
-const PORT = process.env.PORT || 5500;
+export function listenWithFallback(initialPort = 5500, maxAttempts = 10) {
+  return new Promise((resolve, reject) => {
+    let currentPort = initialPort;
 
-async function start() {
-  await initDatabase();
-  server.listen(PORT, () => {
-    const localIp = getLocalIpAddresses();
-    console.log(`====================================================`);
-    console.log(`  AMN Cash Server running on: http://localhost:${PORT}`);
-    console.log(`  LAN Address for Android App: http://${localIp}:${PORT}`);
-    console.log(`====================================================`);
+    function tryBind() {
+      server.removeAllListeners('error');
+      
+      server.once('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          console.warn(`[AMN Cash] Port ${currentPort} is in use by another local system.`);
+          if (maxAttempts > 0) {
+            maxAttempts--;
+            currentPort++;
+            console.log(`[AMN Cash] Auto-trying next port: ${currentPort}...`);
+            setTimeout(tryBind, 100);
+          } else {
+            reject(new Error(`Could not find an available port for AMN Cash`));
+          }
+        } else {
+          reject(err);
+        }
+      });
+
+      server.listen(currentPort, '0.0.0.0', () => {
+        activePort = currentPort;
+        process.env.ACTIVE_PORT = currentPort.toString();
+        const localIp = getLocalIpAddresses();
+        console.log(`====================================================`);
+        console.log(`  AMN Cash Server running on: http://localhost:${currentPort}`);
+        console.log(`  LAN Address for Android App: http://${localIp}:${currentPort}`);
+        console.log(`====================================================`);
+        resolve(currentPort);
+      });
+    }
+
+    tryBind();
   });
 }
 
+export function stopServer() {
+  return new Promise((resolve) => {
+    try {
+      wss.close();
+      server.close(() => {
+        console.log('[AMN Cash] Server stopped and port released.');
+        resolve();
+      });
+    } catch {
+      resolve();
+    }
+  });
+}
+
+export async function start() {
+  await initDatabase();
+  const initialPort = parseInt(process.env.PORT, 10) || 5500;
+  return await listenWithFallback(initialPort);
+}
+
+// Auto-start when executed directly
 start().catch(err => {
   console.error('Failed to start AMN Cash server:', err);
 });
