@@ -11,7 +11,12 @@ import {
   Clock, 
   DollarSign, 
   Sparkles,
-  X
+  X,
+  Trash2,
+  AlertTriangle,
+  RotateCcw,
+  Save,
+  Check
 } from 'lucide-react';
 import ReceiptModal from './ReceiptModal.jsx';
 
@@ -20,9 +25,12 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTx, setSelectedTx] = useState(null);
   const [receiptTx, setReceiptTx] = useState(null);
+  const [editingTx, setEditingTx] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
-  // Embedded Calculator State matching Image 3
+  // Embedded Calculator State
   const [calcAmount, setCalcAmount] = useState('5000');
   const [calcResult, setCalcResult] = useState({ fee: 250, cost: 50, profit: 200 });
 
@@ -41,7 +49,7 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
     return Number(num || 0).toLocaleString('en-US');
   };
 
-  // Sample or real transactions matching Image 3
+  // Filtered transactions
   const displayItems = transactions.filter((tx) => {
     if (filterType === 'WITHDRAWAL' && tx.type !== 'WITHDRAWAL') return false;
     if (filterType === 'INCOMING' && tx.type !== 'INCOMING') return false;
@@ -60,9 +68,7 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
     try {
       const res = await fetch(`/api/transactions/${txId}/verify`, { method: 'POST' });
       const data = await res.json();
-      if (data.success) {
-        if (onRefresh) onRefresh();
-      }
+      if (data.success && onRefresh) onRefresh();
     } catch (err) {
       console.error('Failed to verify transaction:', err);
     }
@@ -72,25 +78,53 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
     try {
       const res = await fetch(`/api/transactions/${txId}/deliver`, { method: 'POST' });
       const data = await res.json();
-      if (data.success) {
-        if (onRefresh) onRefresh();
-      }
+      if (data.success && onRefresh) onRefresh();
     } catch (err) {
       console.error('Failed to mark delivered:', err);
+    }
+  };
+
+  const handleDelete = async (txId) => {
+    if (!window.confirm('هل أنت متأكد من رغبتك في حذف هذه المعاملة نهائياً من السجل؟')) return;
+    try {
+      setDeletingId(txId);
+      const res = await fetch(`/api/transactions/${txId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success && onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to delete transaction:', err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleWipeData = async (mode) => {
+    try {
+      const endpoint = mode === 'MOCK' ? '/api/database/clear-mock' : '/api/database/wipe-all';
+      const res = await fetch(endpoint, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setIsWipeModalOpen(false);
+        if (onRefresh) onRefresh();
+        alert(data.message);
+      }
+    } catch (err) {
+      console.error('Failed to wipe data:', err);
+      alert('حدث خطأ أثناء مسح البيانات');
     }
   };
 
   return (
     <div className="space-y-6 text-right select-none">
       
-      {/* 1. Header & Filter Pills Matching Image 3 */}
+      {/* 1. Header & Actions */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight">المعاملات والحسابات المالية</h2>
-          <p className="text-xs font-semibold text-slate-500 mt-0.5">عرض جميع المعاملات وحساب الأرباح والمصاريف</p>
+          <p className="text-xs font-semibold text-slate-500 mt-0.5">عرض وتعديل جميع المعاملات وتصفير السجل للاستخدام الفعلي</p>
         </div>
 
-        {/* Filter Pills Matching Image 3 */}
+        {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setFilterType('ALL')}
@@ -127,17 +161,25 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all active:scale-95"
           >
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <span>تسجيل معاملة +</span>
+            <PlusCircle className="w-3.5 h-3.5" />
+            <span>تسجيل معاملة يدوية +</span>
+          </button>
+
+          <button
+            onClick={() => setIsWipeModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-[#ca1535] border border-red-200 text-xs font-bold transition-all"
+            title="تصفير البيانات وبدء الاستخدام الفعلي"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>بدء الاستخدام الفعلي (تصفير)</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Embedded Fee Calculator Card Matching Image 3 Middle Screen */}
+      {/* 2. Embedded Fee Calculator Card */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-sm space-y-5">
-        
         <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
           <div className="w-7 h-7 rounded-lg bg-red-100 text-[#ca1535] flex items-center justify-center font-bold">
             <Calculator className="w-4 h-4" />
@@ -150,7 +192,6 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
 
         {/* Input & Calculate Action */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
-          
           <div className="md:col-span-5 space-y-3">
             <div className="relative">
               <span className="text-[11px] font-bold text-slate-500 block mb-1">المبلغ (جنيه)</span>
@@ -175,7 +216,7 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
             </button>
           </div>
 
-          {/* Result Box (Matching Image 3: نتيجة الحساب (مثال)) */}
+          {/* Result Box */}
           <div className="md:col-span-7 bg-[#fffaf5] border border-amber-200/80 rounded-2xl p-4.5 space-y-3">
             <div className="flex items-center justify-between border-b border-amber-100 pb-2">
               <span className="text-xs font-extrabold text-slate-700">نتيجة الحساب (لمبلغ {fmt(calcAmount)} ج)</span>
@@ -220,10 +261,9 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
               </div>
             </div>
           </div>
-
         </div>
 
-        {/* Current Active Rule Footnote Matching Image 3 */}
+        {/* Current Active Rule Footnote */}
         <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-4 text-slate-600 font-medium flex-wrap">
             <span className="font-bold text-slate-700">الإعدادات المستخدمة في الحساب:</span>
@@ -240,10 +280,9 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
             <span>تعديل القيم</span>
           </button>
         </div>
-
       </div>
 
-      {/* 3. Search Bar Matching Image 3 */}
+      {/* 3. Search Bar */}
       <div className="relative">
         <Search className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2" />
         <input
@@ -255,7 +294,7 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
         />
       </div>
 
-      {/* 4. Transactions List Table Matching Image 3 */}
+      {/* 4. Transactions List Table */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
         <div className="p-4 px-6 border-b border-slate-100 flex items-center justify-between">
           <span className="text-xs font-bold text-slate-400">إجمالي: {displayItems.length} عملية</span>
@@ -266,7 +305,7 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-50/70 text-slate-500 font-bold border-b border-slate-200">
               <tr>
-                <th className="py-3 px-5">العميل</th>
+                <th className="py-3 px-5">العميل / الطرف الآخر</th>
                 <th className="py-3 px-5">المبلغ الإجمالي</th>
                 <th className="py-3 px-5 text-emerald-800 bg-emerald-50/70 font-black">المسلّم للمستفيد (كاش)</th>
                 <th className="py-3 px-5">عمولة الخدمة (5%)</th>
@@ -280,7 +319,7 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
               {displayItems.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400">
-                    لا توجد معاملات مطابقة للبحث
+                    لا توجد معاملات مسجلة حتى الآن. يمكنك بدء تسجيل المعاملات الفعلية عبر زر "تسجيل معاملة يدوية +" أو استقبال رسائل المحفظة تلقائياً.
                   </td>
                 </tr>
               ) : (
@@ -293,10 +332,12 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
 
                   return (
                   <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
-                    
                     {/* Customer */}
                     <td className="py-3.5 px-5 font-bold text-slate-900 font-mono">
-                      {tx.senderOrRecipient}
+                      <div>{tx.senderOrRecipient || 'عميل نقدي'}</div>
+                      {tx.referenceNumber && (
+                        <span className="text-[10px] text-slate-400 block font-normal">{tx.referenceNumber}</span>
+                      )}
                     </td>
 
                     {/* Total Amount */}
@@ -304,7 +345,7 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
                       {fmt(tx.amountEGP)} ج
                     </td>
 
-                    {/* Beneficiary Payout (المبلغ المسلم للمستفيد بعد خصم 5% مصاريف السحب) */}
+                    {/* Beneficiary Payout */}
                     <td className="py-3.5 px-5 whitespace-nowrap bg-emerald-50/30">
                       {tx.type === 'INCOMING' ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-black text-xs border border-emerald-300 font-mono">
@@ -316,7 +357,7 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
                       )}
                     </td>
 
-                    {/* Fee (5%) */}
+                    {/* Fee */}
                     <td className="py-3.5 px-5 font-bold text-slate-700 whitespace-nowrap">
                       {tx.feeEGP > 0 ? `${fmt(tx.feeEGP)} ج` : `${fmt(Math.round((tx.amountEGP * feeRate) / 1000))} ج`}
                     </td>
@@ -331,13 +372,13 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
                       {tx.timestamp}
                     </td>
 
-                    {/* Multi-Stage Workflow: رسالة غير مؤكدة -> تأكيد التحويل -> تم تسليم المبلغ -> مكتملة */}
+                    {/* Multi-Stage Workflow */}
                     <td className="py-3 px-4 text-center">
                       {tx.status === 'OBSERVED' ? (
                         <div className="flex flex-col items-center gap-1.5">
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px] border border-amber-200">
                             <Clock className="w-3 h-3 text-amber-600" />
-                            <span>رسالة فقط غير مؤكدة</span>
+                            <span>رسالة غير مؤكدة</span>
                           </span>
                           <button
                             onClick={() => handleVerify(tx.id)}
@@ -373,7 +414,7 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
                       )}
                     </td>
 
-                    {/* Actions */}
+                    {/* Actions: Edit, Delete, Details, Receipt */}
                     <td className="py-3.5 px-5 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button
@@ -384,15 +425,29 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
                           <Printer className="w-4 h-4" />
                         </button>
                         <button
+                          onClick={() => setEditingTx(tx)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          title="تعديل بيانات المعاملة"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => setSelectedTx(tx)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-[#ca1535] hover:bg-red-50 transition-colors"
-                          title="عرض التفاصيل"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                          title="عرض تفاصيل الرسالة"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
+                        <button
+                          onClick={() => handleDelete(tx.id)}
+                          disabled={deletingId === tx.id}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="حذف المعاملة"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
-
                   </tr>
                   );
                 })
@@ -402,7 +457,90 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
         </div>
       </div>
 
-      {/* Details & Receipt Modals */}
+      {/* 5. Add Manual Transaction Modal */}
+      {isAddModalOpen && (
+        <AddTransactionModal
+          isOpen={isAddModalOpen}
+          feeRate={feeRate}
+          costRate={costRate}
+          onClose={() => setIsAddModalOpen(false)}
+          onSuccess={() => {
+            setIsAddModalOpen(false);
+            if (onRefresh) onRefresh();
+          }}
+        />
+      )}
+
+      {/* 6. Edit Transaction Modal */}
+      {editingTx && (
+        <EditTransactionModal
+          transaction={editingTx}
+          feeRate={feeRate}
+          costRate={costRate}
+          onClose={() => setEditingTx(null)}
+          onSuccess={() => {
+            setEditingTx(null);
+            if (onRefresh) onRefresh();
+          }}
+        />
+      )}
+
+      {/* 7. Wipe / Reset Production Data Modal */}
+      {isWipeModalOpen && (
+        <WipeDataModal
+          isOpen={isWipeModalOpen}
+          onClose={() => setIsWipeModalOpen(false)}
+          onWipe={handleWipeData}
+        />
+      )}
+
+      {/* 8. Raw Message Details Modal */}
+      {selectedTx && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-right">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <button onClick={() => setSelectedTx(null)} className="p-1 text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="font-extrabold text-base text-slate-800">تفاصيل المعاملة والرسالة الأصلية</h3>
+            </div>
+            
+            <div className="space-y-3 text-xs">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="font-bold text-slate-500 block mb-1">الطرف الآخر / العميل:</span>
+                <span className="font-mono text-sm font-black text-slate-800">{selectedTx.senderOrRecipient || 'غير محدد'}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span className="font-bold text-slate-500 block mb-1">المبلغ الإجمالي:</span>
+                  <span className="font-mono text-sm font-black text-slate-800">{fmt(selectedTx.amountEGP)} ج</span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span className="font-bold text-slate-500 block mb-1">المسلّم للمستفيد:</span>
+                  <span className="font-mono text-sm font-black text-emerald-700">{fmt(selectedTx.beneficiaryPayoutEGP || selectedTx.amountEGP)} ج</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="font-bold text-slate-500 block mb-1">نص الرسالة الأصلية (SMS):</span>
+                <p className="font-mono text-xs text-slate-700 leading-relaxed bg-white p-3 rounded-lg border border-slate-200 whitespace-pre-wrap">
+                  {selectedTx.rawSms || 'معاملة مسجلة يدوياً'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedTx(null)}
+              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+            >
+              إغلاق
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 9. Receipt Modal */}
       <ReceiptModal 
         transaction={receiptTx}
         settings={settings}
@@ -410,6 +548,496 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
         onClose={() => setReceiptTx(null)}
       />
 
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Component: Add Manual Transaction Modal
+// -----------------------------------------------------------------------------
+function AddTransactionModal({ isOpen, feeRate, costRate, onClose, onSuccess }) {
+  const [type, setType] = useState('INCOMING');
+  const [amount, setAmount] = useState('');
+  const [recipient, setRecipient] = useState('');
+  const [fee, setFee] = useState('');
+  const [cost, setCost] = useState('');
+  const [refNumber, setRefNumber] = useState('');
+  const [status, setStatus] = useState('COMPLETED');
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Auto calculate defaults on amount change
+  const handleAmountChange = (val) => {
+    setAmount(val);
+    const num = parseFloat(val) || 0;
+    if (type === 'INCOMING') {
+      const calculatedFee = Math.round((num * feeRate) / 1000);
+      const calculatedCost = Math.round((num * costRate) / 1000);
+      setFee(calculatedFee.toString());
+      setCost(calculatedCost.toString());
+    } else {
+      setFee('0');
+      setCost('0');
+    }
+  };
+
+  const numAmount = parseFloat(amount) || 0;
+  const numFee = parseFloat(fee) || 0;
+  const payout = type === 'INCOMING' ? Math.max(0, numAmount - numFee) : numAmount;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!numAmount || numAmount <= 0) {
+      alert('يرجى إدخال مبلغ صحيح');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          amountEGP: numAmount,
+          feeEGP: numFee,
+          costEGP: parseFloat(cost) || 0,
+          senderOrRecipient: recipient.trim(),
+          referenceNumber: refNumber.trim(),
+          status,
+          notes: notes.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        onSuccess();
+      } else {
+        alert(data.error || 'فشل تسجيل المعاملة');
+      }
+    } catch (err) {
+      console.error('Failed to submit manual tx:', err);
+      alert('حدث خطأ في الاتصال بالسيرفر');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-right animate-in fade-in zoom-in-95">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600">
+            <X className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <PlusCircle className="w-5 h-5 text-emerald-600" />
+            <h3 className="font-extrabold text-base text-slate-800">تسجيل معاملة يدوية جديدة</h3>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs font-medium">
+          {/* Type Selector */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setType('INCOMING');
+                const num = parseFloat(amount) || 0;
+                setFee(Math.round((num * feeRate) / 1000).toString());
+                setCost(Math.round((num * costRate) / 1000).toString());
+              }}
+              className={`py-2.5 rounded-xl font-bold border transition-all ${
+                type === 'INCOMING'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                  : 'bg-slate-50 text-slate-700 border-slate-200'
+              }`}
+            >
+              استلام تحويل كاش (إيداع)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setType('WITHDRAWAL');
+                setFee('0');
+                setCost('0');
+              }}
+              className={`py-2.5 rounded-xl font-bold border transition-all ${
+                type === 'WITHDRAWAL'
+                  ? 'bg-[#ca1535] text-white border-[#ca1535] shadow-sm'
+                  : 'bg-slate-50 text-slate-700 border-slate-200'
+              }`}
+            >
+              سحب نقدي (ATM / تحويل خارج)
+            </button>
+          </div>
+
+          {/* Amount & Handover Result */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">المبلغ الإجمالي (جنيه) *</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => handleAmountChange(e.target.value)}
+                placeholder="مثال: 2000"
+                required
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-[#ca1535] text-right font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">رقم هاتف العميل / المستفيد</label>
+              <input
+                type="text"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                placeholder="010xxxxxxxx"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-[#ca1535] text-right font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Live Handover Payout Preview */}
+          {type === 'INCOMING' && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+              <div>
+                <span className="font-extrabold text-emerald-900 block text-xs">المبلغ المسلّم للمستفيد نقداً:</span>
+                <span className="text-[10px] text-emerald-700">ناتج خصم مصاريف السحب ({numFee} ج) من الإجمالي</span>
+              </div>
+              <span className="font-mono text-lg font-black text-emerald-800">{payout.toLocaleString()} ج</span>
+            </div>
+          )}
+
+          {/* Fee & Cost Tuning */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">عمولة السحب (جنيه)</label>
+              <input
+                type="number"
+                value={fee}
+                onChange={(e) => setFee(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 text-right"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">مصاريف الماكينة (جنيه)</label>
+              <input
+                type="number"
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 text-right"
+              />
+            </div>
+          </div>
+
+          {/* Status & Reference */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">حالة المعاملة</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 text-right"
+              >
+                <option value="COMPLETED">مكتملة (تم التسليم)</option>
+                <option value="VERIFIED">تم التأكيد (بانتظار التسليم)</option>
+                <option value="OBSERVED">غير مؤكدة</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">رقم العملية المرجعي (اختياري)</label>
+              <input
+                type="text"
+                value={refNumber}
+                onChange={(e) => setRefNumber(e.target.value)}
+                placeholder="TRX-123456"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 text-right"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95"
+            >
+              <Save className="w-4 h-4" />
+              <span>{submitting ? 'جاري الحفظ...' : 'حفظ المعاملة'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Component: Edit Transaction Modal
+// -----------------------------------------------------------------------------
+function EditTransactionModal({ transaction, feeRate, costRate, onClose, onSuccess }) {
+  const [type, setType] = useState(transaction.type || 'INCOMING');
+  const [amount, setAmount] = useState(transaction.amountEGP?.toString() || '');
+  const [recipient, setRecipient] = useState(transaction.senderOrRecipient || '');
+  const [fee, setFee] = useState(transaction.feeEGP?.toString() || '');
+  const [cost, setCost] = useState(transaction.costEGP?.toString() || '');
+  const [refNumber, setRefNumber] = useState(transaction.referenceNumber || '');
+  const [status, setStatus] = useState(transaction.status || 'COMPLETED');
+  const [submitting, setSubmitting] = useState(false);
+
+  const numAmount = parseFloat(amount) || 0;
+  const numFee = parseFloat(fee) || 0;
+  const payout = type === 'INCOMING' ? Math.max(0, numAmount - numFee) : numAmount;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!numAmount || numAmount <= 0) {
+      alert('يرجى إدخال مبلغ صحيح');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await fetch(`/api/transactions/${transaction.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          amountEGP: numAmount,
+          feeEGP: numFee,
+          costEGP: parseFloat(cost) || 0,
+          senderOrRecipient: recipient.trim(),
+          referenceNumber: refNumber.trim(),
+          status
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        onSuccess();
+      } else {
+        alert(data.error || 'فشل تحديث المعاملة');
+      }
+    } catch (err) {
+      console.error('Failed to update tx:', err);
+      alert('حدث خطأ في الاتصال بالسيرفر');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-right animate-in fade-in zoom-in-95">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600">
+            <X className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <Edit3 className="w-5 h-5 text-blue-600" />
+            <h3 className="font-extrabold text-base text-slate-800">تعديل بيانات المعاملة #{transaction.id}</h3>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs font-medium">
+          {/* Type Selector */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setType('INCOMING')}
+              className={`py-2 rounded-xl font-bold border transition-all ${
+                type === 'INCOMING'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                  : 'bg-slate-50 text-slate-700 border-slate-200'
+              }`}
+            >
+              استلام تحويل كاش (إيداع)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setType('WITHDRAWAL')}
+              className={`py-2 rounded-xl font-bold border transition-all ${
+                type === 'WITHDRAWAL'
+                  ? 'bg-[#ca1535] text-white border-[#ca1535] shadow-sm'
+                  : 'bg-slate-50 text-slate-700 border-slate-200'
+              }`}
+            >
+              سحب نقدي (ATM)
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">المبلغ الإجمالي (جنيه) *</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                required
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-[#ca1535] text-right font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">العميل / المستفيد</label>
+              <input
+                type="text"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-[#ca1535] text-right font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Payout Preview */}
+          {type === 'INCOMING' && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+              <div>
+                <span className="font-extrabold text-emerald-900 block text-xs">المبلغ المسلّم للمستفيد نقداً:</span>
+                <span className="text-[10px] text-emerald-700">بعد خصم عمولة السحب ({numFee} ج)</span>
+              </div>
+              <span className="font-mono text-lg font-black text-emerald-800">{payout.toLocaleString()} ج</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">عمولة السحب (جنيه)</label>
+              <input
+                type="number"
+                value={fee}
+                onChange={(e) => setFee(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 text-right"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">مصاريف الماكينة (جنيه)</label>
+              <input
+                type="number"
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 text-right"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">حالة المعاملة</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 text-right"
+              >
+                <option value="COMPLETED">مكتملة (تم التسليم)</option>
+                <option value="VERIFIED">تم التأكيد (بانتظار التسليم)</option>
+                <option value="OBSERVED">غير مؤكدة</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">رقم العملية المرجعي</label>
+              <input
+                type="text"
+                value={refNumber}
+                onChange={(e) => setRefNumber(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 text-right"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95"
+            >
+              <Save className="w-4 h-4" />
+              <span>{submitting ? 'جاري الحفظ...' : 'تحديث المعاملة'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Component: Wipe & Fresh Production Reset Modal
+// -----------------------------------------------------------------------------
+function WipeDataModal({ isOpen, onClose, onWipe }) {
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl text-right animate-in fade-in zoom-in-95">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600">
+            <X className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2 text-red-600">
+            <AlertTriangle className="w-5 h-5" />
+            <h3 className="font-extrabold text-base text-slate-800">بدء الاستخدام الفعلي وتصفير البيانات</h3>
+          </div>
+        </div>
+
+        <p className="text-xs text-slate-600 leading-relaxed font-medium">
+          اختر الإجراء المناسب لتهيئة البرنامج للاستخدام في المحل:
+        </p>
+
+        <div className="space-y-3">
+          {/* Option 1: Clear Mock Data Only */}
+          <button
+            onClick={() => onWipe('MOCK')}
+            className="w-full text-right p-4 rounded-2xl border-2 border-slate-200 hover:border-amber-400 bg-slate-50 hover:bg-amber-50/50 transition-all group"
+          >
+            <strong className="block text-xs font-black text-slate-800 group-hover:text-amber-900 mb-1">
+              1. مسح المعاملات التجريبية فقط (موصى به)
+            </strong>
+            <span className="text-[11px] text-slate-500 block leading-normal">
+              حذف المعاملات التوضيحية الافتراضية (ev_001 إلى ev_007) مع الإبقاء على أي معاملات حقيقية سجلتها بنفسك.
+            </span>
+          </button>
+
+          {/* Option 2: Full Wipe */}
+          <button
+            onClick={() => onWipe('ALL')}
+            className="w-full text-right p-4 rounded-2xl border-2 border-red-200 hover:border-red-500 bg-red-50/40 hover:bg-red-50 transition-all group"
+          >
+            <strong className="block text-xs font-black text-red-700 mb-1">
+              2. تصفير السجل بالكامل (بدء سجل جديد 0 عملية)
+            </strong>
+            <span className="text-[11px] text-red-600/80 block leading-normal">
+              حذف كافة المعاملات نهائياً وتصفير العدادات تماماً للبدء الفعلي من الصفر، مع الحفاظ على إعدادات المحل والنسب.
+            </span>
+          </button>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+        >
+          إلغاء التراجع
+        </button>
+      </div>
     </div>
   );
 }

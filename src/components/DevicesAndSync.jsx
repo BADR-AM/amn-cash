@@ -11,7 +11,8 @@ import {
   ExternalLink,
   Download,
   Copy,
-  Check
+  Check,
+  Trash2
 } from 'lucide-react';
 
 export default function DevicesAndSync({ onOpenSimulator }) {
@@ -58,6 +59,31 @@ export default function DevicesAndSync({ onOpenSimulator }) {
       navigator.clipboard.writeText(downloadInfo.downloadPageUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
+    }
+  };
+
+  const handleDeleteDevice = async (devId) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا الجهاز؟')) return;
+    try {
+      const res = await fetch(`/api/devices/${devId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        fetchDevices();
+      }
+    } catch (err) {
+      console.error('Failed to delete device:', err);
+    }
+  };
+
+  const handleCleanOffline = async () => {
+    try {
+      const res = await fetch('/api/devices/clean-offline', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        fetchDevices();
+      }
+    } catch (err) {
+      console.error('Failed to clean offline devices:', err);
     }
   };
 
@@ -213,13 +239,24 @@ export default function DevicesAndSync({ onOpenSimulator }) {
               </div>
             </div>
 
-            <button
-              onClick={fetchDevices}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>إعادة فحص الاتصال</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCleanOffline}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-[#ca1535] border border-red-200 font-bold text-xs transition-colors"
+                title="حذف كافة الأجهزة غير المتصلة"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>تنظيف غير المتصل</span>
+              </button>
+
+              <button
+                onClick={fetchDevices}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <span>إعادة فحص الاتصال</span>
+              </button>
+            </div>
           </div>
 
           {/* Device Card (Matching Mockup 1: الأجهزة والاتصال) */}
@@ -245,7 +282,7 @@ export default function DevicesAndSync({ onOpenSimulator }) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-6 text-xs text-slate-600 font-medium w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-slate-200">
+                <div className="flex items-center gap-4 text-xs text-slate-600 font-medium w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-slate-200">
                   <div className="text-center md:text-right">
                     <span className="text-slate-400 block text-[10px]">آخر مزامنة</span>
                     <strong className="text-slate-800 font-mono text-[11px]">{dev.last_sync || 'منذ ثوانٍ'}</strong>
@@ -254,6 +291,13 @@ export default function DevicesAndSync({ onOpenSimulator }) {
                     <span className="text-slate-400 block text-[10px]">إجمالي الرسائل</span>
                     <strong className="text-slate-800 font-mono text-sm">{dev.total_messages || 0}</strong>
                   </div>
+                  <button
+                    onClick={() => handleDeleteDevice(dev.id || dev.device_id)}
+                    className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title="حذف هذا الجهاز"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             ))}

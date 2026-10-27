@@ -7,7 +7,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import QRCode from 'qrcode';
-import { initDatabase, runQuery, getQuery, allQuery } from './db.js';
+import { initDatabase, runQuery, getQuery, allQuery, wipeAllTransactions, clearMockTransactions, cleanOfflineDevices } from './db.js';
 import { calculateFees } from './feeEngine.js';
 import { parseVodafoneCashSms, isSensitiveMessage } from './smsParser.js';
 
@@ -478,6 +478,172 @@ app.post('/api/transactions/:id/deliver', async (req, res) => {
   }
 });
 
+// 5.d Create Manual Transaction
+app.post('/api/transactions', async (req, res) => {
+  try {
+    const {
+      type = 'INCOMING',
+      amountEGP,
+      feeEGP,
+      costEGP,
+      senderOrRecipient = '',
+      referenceNumber,
+      status = 'COMPLETED',
+      notes = ''
+    } = req.body;
+
+    if (!amountEGP || parseFloat(amountEGP) <= 0) {
+      return res.status(400).json({ success: false, error: 'المبلغ غير صحيح' });
+    }
+
+    const amt = parseFloat(amountEGP);
+    const amountPiasters = Math.round(amt * 100);
+
+    const feePer1000Row = await getQuery("SELECT value FROM settings WHERE key='fee_per_1000'");
+    const costPer1000Row = await getQuery("SELECT value FROM settings WHERE key='cost_per_1000'");
+    const feePer1000 = feePer1000Row ? parseInt(feePer1000Row.value) : 50;
+    const costPer1000 = costPer1000Row ? parseInt(costPer1000Row.value) : 10;
+
+    let finalFeePiasters;
+    if (feeEGP !== undefined && feeEGP !== null && feeEGP !== '') {
+      finalFeePiasters = Math.round(parseFloat(feeEGP) * 100);
+    } else {
+      finalFeePiasters = type === 'INCOMING' ? Math.round((amt * feePer1000) / 1000 * 100) : 0;
+    }
+
+    let finalCostPiasters;
+    if (costEGP !== undefined && costEGP !== null && costEGP !== '') {
+      finalCostPiasters = Math.round(parseFloat(costEGP) * 100);
+    } else {
+      finalCostPiasters = type === 'INCOMING' ? Math.round((amt * costPer1000) / 1000 * 100) : 0;
+    }
+
+    const profitPiasters = Math.max(0, finalFeePiasters - finalCostPiasters);
+    const ref = referenceNumber?.trim() || `TRX-${Date.now().toString().slice(-6)}`;
+    const eventId = `manual_${Date.now()}`;
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+    const result = await runQuery(`
+      INSERT INTO transactions (
+        event_id, device_id, type, amount_piasters, fee_piasters, cost_piasters, profit_piasters,
+        sender_or_recipient, reference_number, raw_sms, status, source, timestamp, created_at
+      ) VALUES (?, 'manual_entry', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'MANUAL', ?, ?)
+    `, [
+      eventId,
+      type,
+      amountPiasters,
+      finalFeePiasters,
+      finalCostPiasters,
+      profitPiasters,
+      senderOrRecipient || 'عميل نقدي',
+      ref,
+      notes || `معاملة مسجلة يدوياً: ${ref}`,
+      status,
+      now,
+      now
+    ]);
+
+    const createdTx = await getQuery('SELECT * FROM transactions WHERE id = ?', [result.lastID]);
+    broadcast('TRANSACTION_CREATED', createdTx);
+
+    res.json({ success: true, message: 'تم تسجيل المعاملة بنجاح', data: createdTx });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5.e Update Existing Transaction (Edit Details)
+app.put('/api/transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tx = await getQuery('SELECT * FROM transactions WHERE id = ?', [id]);
+    if (!tx) {
+      return res.status(404).json({ success: false, error: 'المعاملة غير موجودة' });
+    }
+
+    const {
+      amountEGP,
+      feeEGP,
+      costEGP,
+      senderOrRecipient,
+      referenceNumber,
+      status,
+      type
+    } = req.body;
+
+    const newAmountEGP = amountEGP !== undefined ? parseFloat(amountEGP) : (tx.amount_piasters / 100);
+    const newAmountPiasters = Math.round(newAmountEGP * 100);
+
+    const newFeePiasters = feeEGP !== undefined ? Math.round(parseFloat(feeEGP) * 100) : tx.fee_piasters;
+    const newCostPiasters = costEGP !== undefined ? Math.round(parseFloat(costEGP) * 100) : tx.cost_piasters;
+    const newProfitPiasters = Math.max(0, newFeePiasters - newCostPiasters);
+    const newSender = senderOrRecipient !== undefined ? senderOrRecipient : tx.sender_or_recipient;
+    const newRef = referenceNumber !== undefined ? referenceNumber : tx.reference_number;
+    const newStatus = status !== undefined ? status : tx.status;
+    const newType = type !== undefined ? type : tx.type;
+
+    await runQuery(`
+      UPDATE transactions 
+      SET amount_piasters = ?,
+          fee_piasters = ?,
+          cost_piasters = ?,
+          profit_piasters = ?,
+          sender_or_recipient = ?,
+          reference_number = ?,
+          status = ?,
+          type = ?
+      WHERE id = ?
+    `, [newAmountPiasters, newFeePiasters, newCostPiasters, newProfitPiasters, newSender, newRef, newStatus, newType, id]);
+
+    const updated = await getQuery('SELECT * FROM transactions WHERE id = ?', [id]);
+    broadcast('TRANSACTION_UPDATED', updated);
+
+    res.json({ success: true, message: 'تم تحديث بيانات المعاملة بنجاح', data: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5.f Delete Transaction
+app.delete('/api/transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tx = await getQuery('SELECT * FROM transactions WHERE id = ?', [id]);
+    if (!tx) {
+      return res.status(404).json({ success: false, error: 'المعاملة غير موجودة' });
+    }
+
+    await runQuery('DELETE FROM transactions WHERE id = ?', [id]);
+    broadcast('TRANSACTION_DELETED', { id: parseInt(id) });
+
+    res.json({ success: true, message: 'تم حذف المعاملة بنجاح' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5.g Wipe Mock Data Only
+app.post('/api/database/clear-mock', async (req, res) => {
+  try {
+    await clearMockTransactions();
+    broadcast('DATABASE_CLEARED', { type: 'MOCK_ONLY' });
+    res.json({ success: true, message: 'تم مسح كافة المعاملات التجريبية بنجاح وبدء السجل النظيف' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5.h Wipe All Transactions (Production Reset / Fresh Start)
+app.post('/api/database/wipe-all', async (req, res) => {
+  try {
+    await wipeAllTransactions();
+    broadcast('DATABASE_WIPED', { type: 'ALL_TRANSACTIONS' });
+    res.json({ success: true, message: 'تم تصفير سجل المعاملات بالكامل بنجاح لبدء الاستخدام الفعلي' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 function getApkFilePath() {
   const candidates = [
     path.resolve(__dirname, '../public/apk/AMN-Cash.apk'),
@@ -693,21 +859,32 @@ app.get('/api/apk-download-qr', async (req, res) => {
 app.get('/api/pairing-qr', async (req, res) => {
   try {
     const localIp = getLocalIpAddresses();
-    const newDeviceId = `dev_${crypto.randomBytes(4).toString('hex')}`;
-    const newDeviceSecret = crypto.randomBytes(32).toString('hex');
+    
+    // Reuse a single dedicated pending pair device to avoid spamming database on refresh
+    let pairDevice = await getQuery("SELECT * FROM devices WHERE device_id = 'dev_mobile_companion' OR status = 'PENDING_PAIR' LIMIT 1");
+    let deviceId = 'dev_mobile_companion';
+    let deviceSecret;
 
-    // Register or upsert device in database
-    await runQuery(`
-      INSERT INTO devices (device_id, device_name, device_ip, device_secret, auth_token, status, last_sync, total_messages, created_at)
-      VALUES (?, ?, ?, ?, ?, 'PENDING_PAIR', datetime('now', 'localtime'), 0, datetime('now', 'localtime'))
-      ON CONFLICT(device_id) DO UPDATE SET device_secret = excluded.device_secret
-    `, [newDeviceId, 'هاتف جديد (Android)', `${localIp}:${activePort}`, newDeviceSecret, newDeviceSecret]);
+    if (pairDevice) {
+      deviceId = pairDevice.device_id;
+      deviceSecret = pairDevice.device_secret || 'sec_' + crypto.randomBytes(16).toString('hex');
+      // Ensure it has valid secret
+      if (!pairDevice.device_secret) {
+        await runQuery('UPDATE devices SET device_secret = ? WHERE device_id = ?', [deviceSecret, deviceId]);
+      }
+    } else {
+      deviceSecret = 'sec_' + crypto.randomBytes(16).toString('hex');
+      await runQuery(`
+        INSERT INTO devices (device_id, device_name, device_ip, device_secret, auth_token, status, last_sync, total_messages, created_at)
+        VALUES (?, ?, ?, ?, ?, 'PENDING_PAIR', datetime('now', 'localtime'), 0, datetime('now', 'localtime'))
+      `, [deviceId, 'هاتف جديد (Android)', `${localIp}:${activePort}`, deviceSecret, deviceSecret]);
+    }
 
     const pairingPayload = {
       appName: 'AMN Cash Collector',
       serverUrl: `http://${localIp}:${activePort}/api/sms/inbox`,
-      deviceId: newDeviceId,
-      deviceSecret: newDeviceSecret,
+      deviceId,
+      deviceSecret,
       timestamp: Date.now()
     };
 
@@ -728,6 +905,60 @@ app.get('/api/pairing-qr', async (req, res) => {
         pairingPayload
       }
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Device Pair Handshake (Called when phone pairs via QR, Deep Link, or IP)
+app.post('/api/devices/pair', async (req, res) => {
+  try {
+    const { deviceId, deviceName, deviceIp, deviceSecret } = req.body;
+    if (!deviceId) {
+      return res.status(400).json({ success: false, error: 'Device ID required' });
+    }
+    const secret = deviceSecret || 'sec_' + crypto.randomBytes(16).toString('hex');
+    const name = deviceName || 'هاتف محمول (Android)';
+    const ip = deviceIp || req.ip || '127.0.0.1';
+
+    await runQuery(`
+      INSERT INTO devices (device_id, device_name, device_ip, device_secret, auth_token, status, last_sync, total_messages, created_at)
+      VALUES (?, ?, ?, ?, ?, 'CONNECTED', datetime('now', 'localtime'), 0, datetime('now', 'localtime'))
+      ON CONFLICT(device_id) DO UPDATE SET 
+        device_name = excluded.device_name,
+        device_ip = excluded.device_ip,
+        device_secret = excluded.device_secret,
+        status = 'CONNECTED',
+        last_sync = datetime('now', 'localtime')
+    `, [deviceId, name, ip, secret, secret]);
+
+    res.json({
+      success: true,
+      message: 'تم ربط الهاتف بالمنظومة بنجاح',
+      data: { deviceId, deviceName: name, deviceSecret: secret }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Delete Device by ID
+app.delete('/api/devices/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await runQuery('DELETE FROM devices WHERE id = ? OR device_id = ?', [id, id]);
+    res.json({ success: true, message: 'تم حذف الجهاز بنجاح' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Clean Offline and Pending Devices
+app.post('/api/devices/clean-offline', async (req, res) => {
+  try {
+    await cleanOfflineDevices();
+    const devices = await allQuery('SELECT * FROM devices ORDER BY id DESC');
+    res.json({ success: true, message: 'تم تنظيف الأجهزة غير المتصلة', devices });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

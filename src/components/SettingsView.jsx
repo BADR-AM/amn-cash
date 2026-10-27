@@ -12,7 +12,9 @@ import {
   Moon, 
   Monitor, 
   Save, 
-  CheckCircle2 
+  CheckCircle2,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function SettingsView({ settings = {}, onSaveSettings }) {
@@ -260,6 +262,49 @@ export default function SettingsView({ settings = {}, onSaveSettings }) {
             >
               <Monitor className="w-4 h-4" />
               <span>حسب النظام</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 6. إدارة البيانات وبدء الاستخدام الفعلي */}
+        <div className="bg-red-50/60 border border-red-200 rounded-2xl p-6 space-y-4 shadow-sm">
+          <div className="flex items-center gap-2 pb-3 border-b border-red-200">
+            <AlertTriangle className="w-5 h-5 text-[#ca1535]" />
+            <div>
+              <h3 className="font-extrabold text-sm text-red-900">بدء الاستخدام الفعلي وتصفير السجل</h3>
+              <p className="text-[11px] text-red-700">مسح البيانات التجريبية وتهيئة النظام لبدء تسجيل المعاملات الحقيقية</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                if (window.confirm('هل تريد مسح المعاملات التجريبية (ev_001 إلى ev_007) والبدء بسجل نظيف؟')) {
+                  const res = await fetch('/api/database/clear-mock', { method: 'POST' });
+                  const data = await res.json();
+                  alert(data.message || 'تم مسح البيانات التجريبية بنجاح');
+                }
+              }}
+              className="w-full sm:flex-1 py-3 px-4 bg-white hover:bg-red-50 text-[#ca1535] border border-red-300 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>مسح المعاملات التجريبية فقط</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                if (window.confirm('تحذير: هل أنت متأكد من تصفير كافة المعاملات نهائياً لبدء الاستخدام الفعلي في المحل؟')) {
+                  const res = await fetch('/api/database/wipe-all', { method: 'POST' });
+                  const data = await res.json();
+                  alert(data.message || 'تم تصفير السجل بنجاح لبدء الاستخدام الفعلي');
+                }
+              }}
+              className="w-full sm:flex-1 py-3 px-4 bg-[#ca1535] hover:bg-[#a70d29] text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>تصفير سجل المعاملات بالكامل (0 عملية)</span>
             </button>
           </div>
         </div>

@@ -118,23 +118,22 @@ export async function initDatabase() {
     await runQuery(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, [k, v]);
   }
 
-  // Seed default phone device and simulator if empty
-  const devCount = await getQuery(`SELECT COUNT(*) as count FROM devices`);
-  if (devCount.count === 0) {
-    await runQuery(`
-      INSERT INTO devices (device_id, device_name, device_ip, device_secret, auth_token, status, last_sync, total_messages, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), ?, datetime('now', 'localtime'))
-    `, ['dev_default_phone', 'هاتف الاستقبال (Android)', '192.168.1.20:5500', 'token_sec_amn_9988_device_secret_2026', 'token_sec_amn_9988', 'CONNECTED', 24]);
+  // Check if initial seeding has already been performed or suppressed
+  const seedDoneRow = await getQuery(`SELECT value FROM settings WHERE key = 'initial_seed_done'`);
+  const isSeedDone = seedDoneRow && seedDoneRow.value === 'true';
 
+  // Seed default phone device and simulator if never initialized
+  const devCount = await getQuery(`SELECT COUNT(*) as count FROM devices`);
+  if (!isSeedDone && devCount.count === 0) {
     await runQuery(`
       INSERT INTO devices (device_id, device_name, device_ip, device_secret, auth_token, status, last_sync, total_messages, created_at)
       VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), ?, datetime('now', 'localtime'))
     `, ['sms_simulator_phone', 'محاكي الاختبار المدمج', '127.0.0.1:5500', 'sim_secret_amn_internal_2026', 'sim_token_local', 'CONNECTED', 0]);
   }
 
-  // Seed sample transactions if empty
+  // Seed sample transactions ONLY on very first run if not already marked done
   const txCount = await getQuery(`SELECT COUNT(*) as count FROM transactions`);
-  if (txCount.count === 0) {
+  if (!isSeedDone && txCount.count === 0) {
     const samples = [
       {
         event_id: 'ev_001',
@@ -236,7 +235,28 @@ export async function initDatabase() {
         s.time
       ]);
     }
+    await runQuery(`INSERT OR REPLACE INTO settings (key, value) VALUES ('initial_seed_done', 'true')`);
   }
 
   console.log('✓ SQLite database initialized successfully at:', dbPath);
+}
+
+// Helper: Wipe all transactions for fresh production start
+export async function wipeAllTransactions() {
+  await runQuery(`DELETE FROM transactions`);
+  try {
+    await runQuery(`DELETE FROM sqlite_sequence WHERE name = 'transactions'`);
+  } catch {}
+  await runQuery(`INSERT OR REPLACE INTO settings (key, value) VALUES ('initial_seed_done', 'true')`);
+}
+
+// Helper: Clear mock/sample transactions only
+export async function clearMockTransactions() {
+  await runQuery(`DELETE FROM transactions WHERE event_id LIKE 'ev_%' OR source = 'SIMULATOR'`);
+  await runQuery(`INSERT OR REPLACE INTO settings (key, value) VALUES ('initial_seed_done', 'true')`);
+}
+
+// Helper: Clean offline or pending unverified devices
+export async function cleanOfflineDevices() {
+  await runQuery(`DELETE FROM devices WHERE status = 'PENDING_PAIR' OR status = 'DISCONNECTED'`);
 }

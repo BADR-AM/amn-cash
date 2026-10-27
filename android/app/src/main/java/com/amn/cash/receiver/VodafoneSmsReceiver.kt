@@ -23,7 +23,8 @@ class VodafoneSmsReceiver : BroadcastReceiver() {
             Pattern.compile("كود التحقق"),
             Pattern.compile("كلمة السر"),
             Pattern.compile("لا تشارك هذا الكود"),
-            Pattern.compile("لا تشارك الرقم السري")
+            Pattern.compile("لا تشارك الرقم السري"),
+            Pattern.compile("do not share", Pattern.CASE_INSENSITIVE)
         )
     }
 
@@ -44,9 +45,9 @@ class VodafoneSmsReceiver : BroadcastReceiver() {
         }
 
         val text = fullBody.toString()
-        Log.d(TAG, "SMS received from: $sender")
+        Log.d(TAG, "SMS received from: $sender | body: $text")
 
-        // 1. Strict Privacy Filter (Drop any OTP or PIN)
+        // 1. Strict Privacy Filter (Drop any OTP or PIN immediately)
         for (pattern in SENSITIVE_PATTERNS) {
             if (pattern.matcher(text).find()) {
                 Log.w(TAG, "Dropping message: contains sensitive OTP/PIN pattern.")
@@ -54,18 +55,27 @@ class VodafoneSmsReceiver : BroadcastReceiver() {
             }
         }
 
-        // 2. Filter for Vodafone Cash Keywords
-        val isVodafoneCash = text.contains("فودافون كاش", ignoreCase = true) ||
+        // 2. Comprehensive Filter for Vodafone Cash Keywords
+        val senderNormalized = sender.uppercase()
+        val isSenderVodafone = senderNormalized.contains("VF-CASH") ||
+                senderNormalized.contains("VODAFONE") ||
+                senderNormalized.contains("V-CASH") ||
+                senderNormalized.contains("1000") ||
+                senderNormalized.contains("9009")
+
+        val isVodafoneCashText = text.contains("فودافون كاش", ignoreCase = true) ||
                 text.contains("Vodafone Cash", ignoreCase = true) ||
                 text.contains("محفظتك", ignoreCase = true) ||
                 text.contains("رصيدك الحالي", ignoreCase = true) ||
-                sender.contains("VF-Cash", ignoreCase = true) ||
-                sender.contains("Vodafone", ignoreCase = true)
+                text.contains("تم استلام مبلغ", ignoreCase = true) ||
+                text.contains("تم تحويل", ignoreCase = true) ||
+                text.contains("سحب نقدي", ignoreCase = true) ||
+                text.contains("مصاريف السحب", ignoreCase = true) ||
+                (text.contains("جنيه") && text.contains("رقم العملية"))
 
-        if (isVodafoneCash) {
+        if (isSenderVodafone || isVodafoneCashText) {
             Log.i(TAG, "Valid Vodafone Cash financial SMS detected! Sending to Windows PC...")
-            // Post to Windows Server via Client
-            WindowsApiClient.sendSmsEvent(context, text)
+            WindowsApiClient.sendSmsEvent(context, text, sender.ifEmpty { "VF-Cash" })
         } else {
             Log.d(TAG, "Ignored SMS: not a Vodafone Cash transaction.")
         }
