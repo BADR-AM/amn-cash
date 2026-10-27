@@ -151,4 +151,3 @@ export function parseVodafoneCashSms(rawText) {
     reason: 'UNKNOWN_SMS_FORMAT'
   };
 }
-}
