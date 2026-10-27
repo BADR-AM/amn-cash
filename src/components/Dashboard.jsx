@@ -8,7 +8,10 @@ import {
   Check, 
   ChevronDown, 
   Calendar, 
-  Info 
+  Info,
+  Clock,
+  CheckCircle2,
+  DollarSign
 } from 'lucide-react';
 
 export default function Dashboard({ 
@@ -17,7 +20,8 @@ export default function Dashboard({
   onNavigateToTransactions, 
   period = 'week', 
   setPeriod, 
-  settings 
+  settings,
+  onRefresh
 }) {
   const feeRate = settings?.fee_per_1000 || '50';
   const costRate = settings?.cost_per_1000 || '10';
@@ -27,6 +31,26 @@ export default function Dashboard({
       minimumFractionDigits: 0,
       maximumFractionDigits: 2
     });
+  };
+
+  const handleVerify = async (txId) => {
+    try {
+      const res = await fetch(`/api/transactions/${txId}/verify`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success && onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to verify transaction:', err);
+    }
+  };
+
+  const handleDeliver = async (txId) => {
+    try {
+      const res = await fetch(`/api/transactions/${txId}/deliver`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success && onRefresh) onRefresh();
+    } catch (err) {
+      console.error('Failed to mark delivered:', err);
+    }
   };
 
   // Percentages for donut
@@ -347,12 +371,44 @@ export default function Dashboard({
                       {tx.profitEGP > 0 ? `${fmt(tx.profitEGP)} ج` : '−'}
                     </td>
 
-                    {/* Status Pill Matching Image 1 */}
+                    {/* Multi-Stage Status: رسالة فقط غير مؤكدة -> تأكيد التحويل -> تم تسليم المبلغ -> مكتملة */}
                     <td className="py-3 px-5 text-center">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200">
-                        <Check className="w-3 h-3 text-emerald-600" />
-                        <span>مكتملة</span>
-                      </span>
+                      {tx.status === 'OBSERVED' ? (
+                        <div className="flex flex-col items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px] border border-amber-200">
+                            <Clock className="w-3 h-3 text-amber-600" />
+                            <span>رسالة فقط غير مؤكدة</span>
+                          </span>
+                          <button
+                            onClick={() => handleVerify(tx.id)}
+                            className="flex items-center gap-1 px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                            title="تأكيد وصول المبلغ في المحفظة واحتساب العمولة"
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>تأكيد التحويل</span>
+                          </button>
+                        </div>
+                      ) : tx.status === 'VERIFIED' ? (
+                        <div className="flex flex-col items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
+                            <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                            <span>تم التأكيد (بانتظار التسليم)</span>
+                          </span>
+                          <button
+                            onClick={() => handleDeliver(tx.id)}
+                            className="flex items-center gap-1 px-3 py-1 rounded-xl bg-[#ca1535] hover:bg-[#b0102c] text-white font-bold text-[10px] transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                            title="تسليم المبلغ نقداً للمستفيد وإتمام المعاملة نهائياً"
+                          >
+                            <DollarSign className="w-3 h-3" />
+                            <span>تم تسليم المبلغ</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200">
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          <span>مكتملة ومُسلّمة</span>
+                        </span>
+                      )}
                     </td>
 
                   </tr>

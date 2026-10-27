@@ -124,6 +124,8 @@ export default function App() {
               profit: msg.data.profitEGP
             });
             setTimeout(() => setToastNotification(null), 5000);
+          } else if (msg.type === 'TRANSACTION_UPDATED') {
+            fetchData();
           } else if (msg.type === 'SETTINGS_UPDATED') {
             setSettings(prev => ({ ...prev, ...msg.data }));
           }
@@ -211,6 +213,7 @@ export default function App() {
                 period={period}
                 setPeriod={setPeriod}
                 settings={settings}
+                onRefresh={fetchData}
               />
             )}
 

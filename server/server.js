@@ -445,6 +445,30 @@ app.post('/api/transactions/:id/verify', async (req, res) => {
   }
 });
 
+// 5.c Mark Delivered / Cash Handed Over (Final Completed Stage)
+app.post('/api/transactions/:id/deliver', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tx = await getQuery('SELECT * FROM transactions WHERE id = ?', [id]);
+    if (!tx) {
+      return res.status(404).json({ success: false, error: 'Transaction not found' });
+    }
+
+    await runQuery(`
+      UPDATE transactions 
+      SET status = 'COMPLETED'
+      WHERE id = ?
+    `, [id]);
+
+    const updated = await getQuery('SELECT * FROM transactions WHERE id = ?', [id]);
+    broadcast('TRANSACTION_UPDATED', updated);
+
+    res.json({ success: true, message: 'تم تسليم المبلغ للعميل واكتمال المعاملة بنجاح', data: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 6. Devices and Pairing QR Code
 app.get('/api/devices', async (req, res) => {
   try {

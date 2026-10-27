@@ -47,19 +47,7 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
     if (filterType === 'INCOMING' && tx.type !== 'INCOMING') return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const handleVerify = async (txId) => {
-    try {
-      const res = await fetch(`/api/transactions/${txId}/verify`, { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        if (onRefresh) onRefresh();
-      }
-    } catch (err) {
-      console.error('Failed to verify transaction:', err);
-    }
-  };
-
-  return (
+      return (
         tx.senderOrRecipient?.toLowerCase().includes(q) ||
         tx.referenceNumber?.toLowerCase().includes(q) ||
         String(tx.amountEGP).includes(q)
@@ -77,6 +65,18 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
       }
     } catch (err) {
       console.error('Failed to verify transaction:', err);
+    }
+  };
+
+  const handleDeliver = async (txId) => {
+    try {
+      const res = await fetch(`/api/transactions/${txId}/deliver`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        if (onRefresh) onRefresh();
+      }
+    } catch (err) {
+      console.error('Failed to mark delivered:', err);
     }
   };
 
@@ -300,32 +300,45 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
                       {tx.timestamp}
                     </td>
 
-                    {/* Status Pill Matching Handoff V2 Specification */}
-                    <td className="py-3.5 px-5 text-center">
+                    {/* Multi-Stage Workflow: رسالة غير مؤكدة -> تأكيد التحويل -> تم تسليم المبلغ -> مكتملة */}
+                    <td className="py-3 px-4 text-center">
                       {tx.status === 'OBSERVED' ? (
-                        <div className="flex flex-col items-center gap-1">
+                        <div className="flex flex-col items-center gap-1.5">
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px] border border-amber-200">
                             <Clock className="w-3 h-3 text-amber-600" />
-                            <span>ملاحظة (بانتظار التأكيد)</span>
+                            <span>رسالة فقط غير مؤكدة</span>
                           </span>
                           <button
                             onClick={() => handleVerify(tx.id)}
-                            className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition-colors shadow-sm"
-                            title="تأكيد العملية واحتساب العمولة"
+                            className="flex items-center gap-1 px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                            title="تأكيد وصول المبلغ في المحفظة واحتساب العمولة"
                           >
-                            تأكيد العمولة
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>تأكيد التحويل</span>
                           </button>
                         </div>
                       ) : tx.status === 'VERIFIED' ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
-                          <CheckCircle2 className="w-3 h-3 text-blue-600" />
-                          <span>مؤكدة ومحتسبة</span>
-                        </span>
+                        <div className="flex flex-col items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
+                            <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                            <span>تم التأكيد (بانتظار التسليم)</span>
+                          </span>
+                          <button
+                            onClick={() => handleDeliver(tx.id)}
+                            className="flex items-center gap-1 px-3 py-1 rounded-xl bg-[#ca1535] hover:bg-[#b0102c] text-white font-bold text-[10px] transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                            title="تسليم المبلغ نقداً للمستفيد وإتمام المعاملة نهائياً"
+                          >
+                            <DollarSign className="w-3 h-3" />
+                            <span>تم تسليم المبلغ</span>
+                          </button>
+                        </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>مكتملة</span>
-                        </span>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>مكتملة (تم التسليم)</span>
+                          </span>
+                        </div>
                       )}
                     </td>
 

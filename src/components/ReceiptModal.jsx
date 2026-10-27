@@ -87,11 +87,15 @@ export default function ReceiptModal({ transaction, settings, isOpen, onClose })
               <span className="text-slate-500">تاريخ ووقت العملية:</span>
               <span className="font-mono font-bold text-slate-700 text-[11px]">{transaction.timestamp}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-slate-500">حالة المعاملة:</span>
-              <span className="font-bold text-emerald-600 flex items-center gap-1">
+              <span className={`font-bold flex items-center gap-1 ${
+                transaction.status === 'COMPLETED' ? 'text-emerald-600' :
+                transaction.status === 'VERIFIED' ? 'text-blue-600' : 'text-amber-600'
+              }`}>
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                مكتملة ومسجلة
+                {transaction.status === 'COMPLETED' ? 'مكتملة - تم تسليم المبلغ نقداً' :
+                 transaction.status === 'VERIFIED' ? 'مؤكدة بالمحفظة - بانتظار التسليم' : 'رسالة فقط (غير مؤكدة)'}
               </span>
             </div>
           </div>
