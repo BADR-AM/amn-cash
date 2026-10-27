@@ -10,6 +10,7 @@ import DevicesAndSync from './components/DevicesAndSync.jsx';
 import SettingsView from './components/SettingsView.jsx';
 import SmsSimulatorModal from './components/SmsSimulatorModal.jsx';
 import PhoneCompanionSidecar from './components/PhoneCompanionSidecar.jsx';
+import DownloadApkModal from './components/DownloadApkModal.jsx';
 
 // Web Audio Chime on new payment
 function playPaymentSound() {
@@ -65,6 +66,7 @@ export default function App() {
   const [transactions, setTransactions] = useState([]);
   const [settings, setSettings] = useState({});
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [lastSync, setLastSync] = useState('منذ 10 ثواني');
@@ -183,7 +185,11 @@ export default function App() {
     <div className="flex flex-col h-screen bg-[#f3f5f8] text-[#192336] overflow-hidden font-sans select-none">
       
       {/* 1. Windows Window Title Bar Matching Image 1 Header */}
-      <TitleBar showPhone={showPhone} setShowPhone={setShowPhone} />
+      <TitleBar 
+        showPhone={showPhone} 
+        setShowPhone={setShowPhone} 
+        onOpenDownloadModal={() => setIsDownloadModalOpen(true)}
+      />
 
       {/* 2. Main Window Body */}
       <div className="flex-1 flex overflow-hidden">
@@ -193,6 +199,7 @@ export default function App() {
           currentTab={currentTab} 
           setCurrentTab={setCurrentTab} 
           onOpenSimulator={() => setIsSimulatorOpen(true)}
+          onOpenDownloadModal={() => setIsDownloadModalOpen(true)}
           isOnline={isOnline}
           lastSync={lastSync}
         />
@@ -276,6 +283,12 @@ export default function App() {
         isOpen={isSimulatorOpen}
         onClose={() => setIsSimulatorOpen(false)}
         onTransactionCreated={fetchData}
+      />
+
+      {/* 5. Mobile Companion APK Download Modal via QR Code */}
+      <DownloadApkModal 
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
       />
 
       {/* 5. Live Incoming Transaction Toast Alert */}

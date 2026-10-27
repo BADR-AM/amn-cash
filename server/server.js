@@ -478,6 +478,22 @@ app.post('/api/transactions/:id/deliver', async (req, res) => {
   }
 });
 
+function getApkFilePath() {
+  const candidates = [
+    path.resolve(__dirname, '../public/apk/AMN-Cash.apk'),
+    path.resolve(__dirname, '../dist-android/app-debug.apk'),
+    path.resolve(__dirname, '../../dist-android/app-debug.apk'),
+    path.resolve(__dirname, '../dist/apk/AMN-Cash.apk'),
+    path.join(process.resourcesPath || '', 'apk/AMN-Cash.apk'),
+    path.join(process.resourcesPath || '', 'dist-android/app-debug.apk'),
+    'G:\\amn cash\\resources\\apk\\AMN-Cash.apk'
+  ];
+  for (const c of candidates) {
+    if (c && fs.existsSync(c)) return c;
+  }
+  return null;
+}
+
 // 6. Devices and Pairing QR Code
 app.get('/api/devices', async (req, res) => {
   try {
@@ -489,6 +505,117 @@ app.get('/api/devices', async (req, res) => {
         devices,
         serverHost: `${localIp}:5500`,
         status: 'LISTENING'
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Download Mobile App Landing Page for Phone Browsers via QR Code
+app.get('/download-app', (req, res) => {
+  const localIp = getLocalIpAddresses();
+  const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تحميل تطبيق AMN Cash لهواتف أندرويد</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", sans-serif; }
+    body { background-color: #f3f5f8; color: #1e293b; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .card { background: white; max-width: 440px; width: 100%; border-radius: 28px; padding: 32px 24px; box-shadow: 0 20px 40px -15px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; text-align: center; }
+    .logo { width: 72px; height: 72px; background: #ca1535; border-radius: 20px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; font-size: 24px; box-shadow: 0 10px 20px rgba(202,21,53,0.25); }
+    h1 { font-size: 20px; font-weight: 900; color: #0f172a; margin-bottom: 6px; }
+    p.sub { font-size: 13px; color: #64748b; margin-bottom: 24px; line-height: 1.5; }
+    .btn { display: block; width: 100%; background: #ca1535; color: white; text-decoration: none; padding: 16px; border-radius: 18px; font-weight: 800; font-size: 16px; box-shadow: 0 8px 18px rgba(202,21,53,0.3); transition: all 0.2s; margin-bottom: 24px; }
+    .btn:active { transform: scale(0.97); }
+    .steps { background: #f8fafc; border-radius: 20px; padding: 18px; text-align: right; border: 1px solid #e2e8f0; margin-bottom: 20px; }
+    .step-title { font-size: 13px; font-weight: 800; color: #334155; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+    .step-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; font-size: 12px; color: #475569; line-height: 1.5; }
+    .step-item:last-child { margin-bottom: 0; }
+    .step-num { width: 22px; height: 22px; background: #fee2e2; color: #ca1535; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; flex-shrink: 0; margin-top: 1px; }
+    .footer { font-size: 11px; color: #94a3b8; }
+    .badge { display: inline-block; background: #ecfdf5; color: #059669; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid #a7f3d0; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">AMN</div>
+    <span class="badge">● متصل بالشبكة المحلية (${localIp})</span>
+    <h1>تطبيق AMN Cash Collector</h1>
+    <p class="sub">تطبيق الهاتف المخصص لالتقاط رسائل فودافون كاش ومزامنتها فورياً مع جهاز الكمبيوتر.</p>
+    
+    <a href="/api/download/apk" class="btn" id="dlBtn">📥 اضغط هنا لبدء التحميل (APK)</a>
+
+    <div class="steps">
+      <div class="step-title">📋 خطوات التثبيت السريعة:</div>
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div>عند ظهور تنبيه الأمان، اختر <strong>«تنزيل على أي حال (Download anyway)»</strong> لأن التطبيق آمن ومخصص لشبكتكم الداخلية.</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div>بعد انتهاء التحميل اضغط على الملف واختر <strong>«تثبيت (Install)»</strong>.</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div>افتح التطبيق وامنحه صلاحية قراءة الرسائل، ثم امسح <strong>كود الربط (QR Code)</strong> المعروض على شاشة الكمبيوتر.</div>
+      </div>
+    </div>
+
+    <div class="footer">نظام إدارة ومتابعة معاملات فودافون كاش - AMN Cash v1.0</div>
+  </div>
+
+  <script>
+    // Automatically trigger download after 1.2 seconds
+    setTimeout(function() {
+      window.location.href = '/api/download/apk';
+    }, 1200);
+  </script>
+</body>
+</html>`;
+  res.send(html);
+});
+
+// Download Binary APK Endpoint
+app.get('/api/download/apk', (req, res) => {
+  const apkPath = getApkFilePath();
+  if (apkPath && fs.existsSync(apkPath)) {
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="AMN-Cash-Collector.apk"');
+    res.sendFile(apkPath);
+  } else {
+    res.status(404).send('ملف تطبيق الهاتف (APK) غير متوفر حالياً على هذا السيرفر.');
+  }
+});
+
+// Get QR Code for Mobile APK Download
+app.get('/api/apk-download-qr', async (req, res) => {
+  try {
+    const localIp = getLocalIpAddresses();
+    const downloadPageUrl = `http://${localIp}:5500/download-app`;
+    const apkDirectUrl = `http://${localIp}:5500/api/download/apk`;
+    const apkPath = getApkFilePath();
+
+    const qrDataUrl = await QRCode.toDataURL(downloadPageUrl, {
+      width: 280,
+      margin: 2,
+      color: {
+        dark: '#0f172a',
+        light: '#ffffff'
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        downloadPageUrl,
+        apkDirectUrl,
+        qrCode: qrDataUrl,
+        localIp,
+        apkAvailable: !!apkPath,
+        apkSizeMB: apkPath ? (fs.statSync(apkPath).size / (1024 * 1024)).toFixed(1) : '8.2'
       }
     });
   } catch (err) {

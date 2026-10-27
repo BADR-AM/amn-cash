@@ -33,6 +33,10 @@
       {
         "from": "build/icon.ico",
         "to": "icon.ico"
+      },
+      {
+        "from": "dist-android/app-debug.apk",
+        "to": "apk/AMN-Cash.apk"
       }
     ],
     "asarUnpack": [

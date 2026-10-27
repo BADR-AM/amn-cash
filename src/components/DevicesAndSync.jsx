@@ -8,13 +8,19 @@ import {
   Wifi, 
   ShieldCheck, 
   Key,
-  ExternalLink
+  ExternalLink,
+  Download,
+  Copy,
+  Check
 } from 'lucide-react';
 
 export default function DevicesAndSync({ onOpenSimulator }) {
   const [deviceInfo, setDeviceInfo] = useState(null);
   const [qrData, setQrData] = useState(null);
+  const [downloadInfo, setDownloadInfo] = useState(null);
+  const [activeQrTab, setActiveQrTab] = useState('DOWNLOAD'); // 'DOWNLOAD' or 'PAIR'
   const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   const fetchDevices = async () => {
     try {
@@ -30,6 +36,12 @@ export default function DevicesAndSync({ onOpenSimulator }) {
       if (qrJson.success) {
         setQrData(qrJson.data);
       }
+
+      const dlRes = await fetch('/api/apk-download-qr');
+      const dlJson = await dlRes.json();
+      if (dlJson.success) {
+        setDownloadInfo(dlJson.data);
+      }
     } catch (err) {
       console.error('Failed to fetch devices:', err);
     } finally {
@@ -41,46 +53,150 @@ export default function DevicesAndSync({ onOpenSimulator }) {
     fetchDevices();
   }, []);
 
+  const handleCopyLink = () => {
+    if (downloadInfo?.downloadPageUrl) {
+      navigator.clipboard.writeText(downloadInfo.downloadPageUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* 1. QR Code Pairing Card */}
-      <div className="bg-white rounded-3xl p-7 border border-slate-200 shadow-sm flex flex-col items-center text-center space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-red-100 text-[#ca1535] flex items-center justify-center font-bold">
-          <QrCode className="w-6 h-6" />
+      
+      {/* 1. QR Code Card: Tabbed between Download APK and Device Pairing */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col items-center text-center space-y-4">
+        
+        {/* Tab Switcher */}
+        <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-2xl w-full text-xs font-bold">
+          <button
+            onClick={() => setActiveQrTab('DOWNLOAD')}
+            className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              activeQrTab === 'DOWNLOAD'
+                ? 'bg-white text-[#ca1535] shadow-sm font-black'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>1. تحميل التطبيق (APK)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveQrTab('PAIR')}
+            className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              activeQrTab === 'PAIR'
+                ? 'bg-white text-emerald-700 shadow-sm font-black'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            <span>2. ربط الهاتف</span>
+          </button>
         </div>
 
-        <div>
-          <h3 className="font-extrabold text-base text-slate-800">ربط هاتف الأندرويد (QR Code)</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-xs font-medium">
-            امسح الكود من تطبيق Android Collector للربط التلقائي وتلقي رسائل Vodafone Cash
-          </p>
-        </div>
-
-        {/* QR Preview */}
-        <div className="p-3 bg-slate-50 border-2 border-dashed border-red-200 rounded-3xl shadow-inner my-2">
-          {qrData?.qrCode ? (
-            <img 
-              src={qrData.qrCode} 
-              alt="Pairing QR" 
-              className="w-56 h-56 rounded-2xl shadow-sm"
-            />
-          ) : (
-            <div className="w-56 h-56 flex items-center justify-center text-slate-400 text-xs">
-              جاري تجهيز كود الربط...
+        {activeQrTab === 'DOWNLOAD' ? (
+          /* Tab 1: Scan QR to Download APK on Phone */
+          <div className="space-y-3 w-full flex flex-col items-center animate-in fade-in duration-150">
+            <div>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-50 text-[#ca1535] text-[10px] font-extrabold border border-red-200 mb-1">
+                <Wifi className="w-3 h-3 animate-pulse" />
+                <span>عبر شبكة Wi-Fi المحلية</span>
+              </span>
+              <h3 className="font-extrabold text-sm text-slate-800">امسح الكود بكاميرا الموبايل</h3>
+              <p className="text-[11px] text-slate-500 mt-0.5 max-w-xs font-medium">
+                وجّه كاميرا الهاتف أو تطبيق مسح QR لتحميل التطبيق مباشرة على جهازك
+              </p>
             </div>
-          )}
-        </div>
 
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 w-full text-xs space-y-1 font-mono text-slate-600">
-          <div className="flex justify-between">
-            <span className="font-bold">عنوان السيرفر:</span>
-            <span className="text-[#ca1535] font-black">{qrData?.serverAddress || '192.168.1.x:5500'}</span>
+            {/* QR Preview for APK Download */}
+            <div className="p-3 bg-slate-50 border-2 border-dashed border-red-200 rounded-3xl shadow-inner my-1">
+              {downloadInfo?.qrCode ? (
+                <img 
+                  src={downloadInfo.qrCode} 
+                  alt="Scan to Download APK" 
+                  className="w-48 h-48 rounded-2xl shadow-sm border border-slate-200 bg-white p-2"
+                />
+              ) : (
+                <div className="w-48 h-48 flex items-center justify-center text-slate-400 text-xs">
+                  جاري توليد كود التحميل...
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 w-full text-xs space-y-1 font-mono text-slate-600">
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="font-bold">رابط التحميل:</span>
+                <button
+                  onClick={handleCopyLink}
+                  className="flex items-center gap-1 text-[#ca1535] hover:text-[#a70d29] font-bold text-[10px]"
+                >
+                  {copied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                  <span>{copied ? 'تم النسخ' : 'نسخ الرابط'}</span>
+                </button>
+              </div>
+              <div className="text-[10px] text-slate-700 bg-white p-1 rounded border border-slate-200 truncate dir-ltr text-center">
+                {downloadInfo?.downloadPageUrl || `http://${deviceInfo?.serverHost || '192.168.1.x:5500'}/download-app`}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveQrTab('PAIR')}
+              className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 active:scale-95"
+            >
+              <span>تم التثبيت؟ انتقل لكود الربط</span>
+              <QrCode className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <div className="flex justify-between">
-            <span className="font-bold">المنفذ:</span>
-            <span>5500</span>
+        ) : (
+          /* Tab 2: Pairing QR Code */
+          <div className="space-y-3 w-full flex flex-col items-center animate-in fade-in duration-150">
+            <div>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-extrabold border border-emerald-200 mb-1">
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                <span>الخطوة 2: مزامنة الرسائل</span>
+              </span>
+              <h3 className="font-extrabold text-sm text-slate-800">امسح الكود من داخل تطبيق الهاتف</h3>
+              <p className="text-[11px] text-slate-500 mt-0.5 max-w-xs font-medium">
+                افتح تطبيق AMN Cash على الهاتف واضغط "مسح كود الربط" لتوصيله فوراً
+              </p>
+            </div>
+
+            {/* QR Preview for Pairing */}
+            <div className="p-3 bg-slate-50 border-2 border-dashed border-emerald-200 rounded-3xl shadow-inner my-1">
+              {qrData?.qrCode ? (
+                <img 
+                  src={qrData.qrCode} 
+                  alt="Pairing QR" 
+                  className="w-48 h-48 rounded-2xl shadow-sm border border-slate-200 bg-white p-2"
+                />
+              ) : (
+                <div className="w-48 h-48 flex items-center justify-center text-slate-400 text-xs">
+                  جاري تجهيز كود الربط...
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 w-full text-xs space-y-1 font-mono text-slate-600">
+              <div className="flex justify-between text-[11px]">
+                <span className="font-bold">عنوان السيرفر:</span>
+                <span className="text-[#ca1535] font-black">{qrData?.serverAddress || '192.168.1.x:5500'}</span>
+              </div>
+              <div className="flex justify-between text-[11px]">
+                <span className="font-bold">بروتوكول الأمان:</span>
+                <span className="text-emerald-700 font-bold">HMAC-SHA256</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveQrTab('DOWNLOAD')}
+              className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <span>العودة لكود تحميل التطبيق (APK)</span>
+            </button>
           </div>
-        </div>
+        )}
+
       </div>
 
       {/* 2. Paired Devices List & Status */}

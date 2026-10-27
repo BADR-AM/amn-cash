@@ -2,7 +2,7 @@ import React from 'react';
 import { Minus, Square, X, Smartphone } from 'lucide-react';
 import appLogo from '../assets/app-logo.png';
 
-export default function TitleBar({ showPhone, setShowPhone }) {
+export default function TitleBar({ showPhone, setShowPhone, onOpenDownloadModal }) {
   return (
     <div className="h-10 bg-[#ca1535] text-white flex items-center justify-between px-4 select-none shrink-0 border-b border-red-700/50 shadow-sm z-30">
       
@@ -16,8 +16,17 @@ export default function TitleBar({ showPhone, setShowPhone }) {
         <span className="font-bold text-xs tracking-wide">إدارة معاملات فودافون كاش — AMN Cash</span>
       </div>
 
-      {/* Center Action: Toggle Live Phone Panel */}
-      <div className="hidden sm:flex items-center">
+      {/* Center Actions: Download APK & Toggle Live Phone Panel */}
+      <div className="hidden sm:flex items-center gap-2">
+        <button
+          onClick={onOpenDownloadModal}
+          className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-black/20 hover:bg-black/35 text-white transition-all border border-white/10"
+          title="تحميل تطبيق الأندرويد للموبايل عبر مسح QR Code"
+        >
+          <Smartphone className="w-3.5 h-3.5 text-emerald-300" />
+          <span>تحميل تطبيق الهاتف (QR)</span>
+        </button>
+
         <button
           onClick={() => setShowPhone(!showPhone)}
           className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
