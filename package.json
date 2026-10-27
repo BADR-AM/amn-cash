@@ -33,6 +33,7 @@
       "**/node_modules/sqlite3/**/*"
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",

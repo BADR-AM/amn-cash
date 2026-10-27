@@ -10,6 +10,7 @@ import {
   Radio, 
   SendHorizontal 
 } from 'lucide-react';
+import appLogo from '../assets/app-logo.png';
 
 export default function Sidebar({ currentTab, setCurrentTab, onOpenSimulator, isOnline, lastSync }) {
   const menuItems = [
@@ -28,16 +29,17 @@ export default function Sidebar({ currentTab, setCurrentTab, onOpenSimulator, is
       <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
 
       <div>
-        {/* Brand Header Matching Image 1 */}
+        {/* Brand Header Matching Official Central Security Wallet Branding */}
         <div className="pt-6 pb-5 px-5 flex flex-col items-center text-center border-b border-white/10">
-          {/* Circular Vodafone/AMN Logo Mark */}
-          <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-[#ca1535] shadow-lg mb-2 p-1">
-            <div className="w-full h-full rounded-full border-2 border-[#ca1535] flex items-center justify-center font-black text-xl tracking-tighter">
-              VF
-            </div>
+          <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg mb-2 p-1 border border-white/20">
+            <img 
+              src={appLogo} 
+              alt="AMN Cash" 
+              className="w-full h-full object-contain rounded-xl drop-shadow"
+            />
           </div>
-          <strong className="font-extrabold text-base tracking-wide text-white block">vodafone cash</strong>
-          <span className="text-[10px] text-red-200 block font-medium">AMN Manager</span>
+          <strong className="font-extrabold text-base tracking-wide text-white block">AMN Cash</strong>
+          <span className="text-[10px] text-red-200 block font-medium">إدارة المحفظة والمعاملات</span>
         </div>
 
         {/* Navigation Items */}

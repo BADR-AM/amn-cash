@@ -13,6 +13,7 @@ import {
   Wifi,
   BatteryMedium
 } from 'lucide-react';
+import appLogoRound from '../assets/app-logo-round.png';
 
 export default function PhoneCompanionSidecar({ isConnected = true, onSendTestSms, totalSent = 24 }) {
   const [isServiceActive, setIsServiceActive] = useState(true);
@@ -48,12 +49,14 @@ export default function PhoneCompanionSidecar({ isConnected = true, onSendTestSm
         </button>
 
         <div className="flex items-center gap-2">
-          {/* Vodafone White Logo Icon */}
-          <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-[#b90e2e] font-black text-xs shadow-sm">
-            VF
-          </div>
+          {/* Central Security Android Wallet Logo */}
+          <img 
+            src={appLogoRound} 
+            alt="AMN Collector" 
+            className="w-8 h-8 rounded-full object-cover shadow-sm border border-white/20"
+          />
           <div className="text-right">
-            <h3 className="font-bold text-xs text-white leading-tight">Vodafone Cash Collector</h3>
+            <h3 className="font-bold text-xs text-white leading-tight">AMN Cash Collector</h3>
             <p className="text-[10px] text-red-100">التقاط وإرسال رسائل فودافون كاش</p>
           </div>
         </div>

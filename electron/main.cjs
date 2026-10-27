@@ -43,6 +43,7 @@ function createWindow() {
     minHeight: 700,
     title: 'AMN Cash | إدارة معاملات فودافون كاش',
     backgroundColor: '#f3f5f8',
+    icon: path.join(__dirname, '../build/icon.ico'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

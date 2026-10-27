@@ -1,5 +1,6 @@
 import React from 'react';
 import { Minus, Square, X, Smartphone } from 'lucide-react';
+import appLogo from '../assets/app-logo.png';
 
 export default function TitleBar({ showPhone, setShowPhone }) {
   return (
@@ -7,9 +8,11 @@ export default function TitleBar({ showPhone, setShowPhone }) {
       
       {/* Brand & App Title */}
       <div className="flex items-center gap-2.5">
-        <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center text-[#ca1535] font-black text-[11px] shadow-sm">
-          VF
-        </div>
+        <img 
+          src={appLogo} 
+          alt="AMN Cash" 
+          className="w-5 h-5 rounded-md object-contain shadow-sm"
+        />
         <span className="font-bold text-xs tracking-wide">إدارة معاملات فودافون كاش — AMN Cash</span>
       </div>
 
