@@ -315,8 +315,9 @@ export default function Dashboard({
                 <th className="py-3 px-5">الوقت</th>
                 <th className="py-3 px-5">العميل / الرقم</th>
                 <th className="py-3 px-5">النوع</th>
-                <th className="py-3 px-5">المبلغ</th>
-                <th className="py-3 px-5">رسوم الخدمة</th>
+                <th className="py-3 px-5">المبلغ الإجمالي</th>
+                <th className="py-3 px-5 text-emerald-800 bg-emerald-50/60 font-black">المسلّم للمستفيد (كاش)</th>
+                <th className="py-3 px-5">رسوم الخدمة (5%)</th>
                 <th className="py-3 px-5">مصاريف السحب</th>
                 <th className="py-3 px-5">الربح</th>
                 <th className="py-3 px-5 text-center">الحالة</th>
@@ -325,6 +326,10 @@ export default function Dashboard({
             <tbody className="divide-y divide-slate-100 font-medium">
               {recentTransactions.map((tx) => {
                 const isIncoming = tx.type === 'INCOMING';
+                const payoutEGP = tx.beneficiaryPayoutEGP !== undefined
+                  ? tx.beneficiaryPayoutEGP
+                  : (isIncoming ? Math.max(0, tx.amountEGP - (tx.feeEGP || Math.round((tx.amountEGP * 50) / 1000))) : tx.amountEGP);
+
                 return (
                   <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
                     
@@ -351,14 +356,26 @@ export default function Dashboard({
                       )}
                     </td>
 
-                    {/* Amount */}
+                    {/* Total Amount */}
                     <td className="py-3 px-5 font-black text-slate-900 whitespace-nowrap">
                       {fmt(tx.amountEGP)} ج
                     </td>
 
+                    {/* Beneficiary Payout */}
+                    <td className="py-3 px-5 whitespace-nowrap bg-emerald-50/30">
+                      {isIncoming ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-900 font-black text-xs border border-emerald-300 font-mono">
+                          <span>{fmt(payoutEGP)}</span>
+                          <span className="text-[10px] font-bold">ج</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">−</span>
+                      )}
+                    </td>
+
                     {/* Service Fee */}
                     <td className="py-3 px-5 font-bold text-slate-700 whitespace-nowrap">
-                      {tx.feeEGP > 0 ? `${fmt(tx.feeEGP)} ج` : '−'}
+                      {tx.feeEGP > 0 ? `${fmt(tx.feeEGP)} ج` : `${fmt(Math.round((tx.amountEGP * 50) / 1000))} ج`}
                     </td>
 
                     {/* Withdrawal Expense */}

@@ -182,10 +182,21 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
             </div>
 
             <div className="space-y-2 text-xs">
+              {/* Cash Handover to Beneficiary */}
+              <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 flex justify-between items-center text-xs">
+                <span className="font-extrabold text-emerald-900 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                  المبلغ المسلّم للمستفيد نقداً:
+                </span>
+                <span className="font-black text-emerald-800 text-sm font-mono">
+                  {fmt(Math.max(0, (parseFloat(calcAmount) || 0) - calcResult.fee))} ج
+                </span>
+              </div>
+
               <div className="flex justify-between items-center">
                 <span className="text-slate-600 flex items-center gap-2 font-medium">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
-                  إجمالي عمولة السحب:
+                  إجمالي عمولة السحب (5%):
                 </span>
                 <span className="font-extrabold text-slate-900 font-mono">{fmt(calcResult.fee)} ج</span>
               </div>
@@ -256,9 +267,10 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
             <thead className="bg-slate-50/70 text-slate-500 font-bold border-b border-slate-200">
               <tr>
                 <th className="py-3 px-5">العميل</th>
-                <th className="py-3 px-5">المبلغ</th>
-                <th className="py-3 px-5">العمولة</th>
-                <th className="py-3 px-5">الصافي</th>
+                <th className="py-3 px-5">المبلغ الإجمالي</th>
+                <th className="py-3 px-5 text-emerald-800 bg-emerald-50/70 font-black">المسلّم للمستفيد (كاش)</th>
+                <th className="py-3 px-5">عمولة الخدمة (5%)</th>
+                <th className="py-3 px-5">أرباح المحل</th>
                 <th className="py-3 px-5">التاريخ والوقت</th>
                 <th className="py-3 px-5 text-center">الحالة</th>
                 <th className="py-3 px-5 text-center">إجراءات</th>
@@ -267,12 +279,19 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
             <tbody className="divide-y divide-slate-100 font-medium">
               {displayItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     لا توجد معاملات مطابقة للبحث
                   </td>
                 </tr>
               ) : (
-                displayItems.map((tx) => (
+                displayItems.map((tx) => {
+                  const payoutEGP = tx.beneficiaryPayoutEGP !== undefined 
+                    ? tx.beneficiaryPayoutEGP 
+                    : (tx.type === 'INCOMING' 
+                        ? Math.max(0, tx.amountEGP - (tx.feeEGP || Math.round((tx.amountEGP * feeRate) / 1000))) 
+                        : tx.amountEGP);
+
+                  return (
                   <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
                     
                     {/* Customer */}
@@ -280,14 +299,26 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
                       {tx.senderOrRecipient}
                     </td>
 
-                    {/* Amount */}
+                    {/* Total Amount */}
                     <td className="py-3.5 px-5 font-black text-slate-900 whitespace-nowrap">
                       {fmt(tx.amountEGP)} ج
                     </td>
 
-                    {/* Fee */}
+                    {/* Beneficiary Payout (المبلغ المسلم للمستفيد بعد خصم 5% مصاريف السحب) */}
+                    <td className="py-3.5 px-5 whitespace-nowrap bg-emerald-50/30">
+                      {tx.type === 'INCOMING' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-black text-xs border border-emerald-300 font-mono">
+                          <span>{fmt(payoutEGP)}</span>
+                          <span className="text-[10px] font-bold">ج</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">−</span>
+                      )}
+                    </td>
+
+                    {/* Fee (5%) */}
                     <td className="py-3.5 px-5 font-bold text-slate-700 whitespace-nowrap">
-                      {tx.feeEGP > 0 ? `${fmt(tx.feeEGP)} ج` : '−'}
+                      {tx.feeEGP > 0 ? `${fmt(tx.feeEGP)} ج` : `${fmt(Math.round((tx.amountEGP * feeRate) / 1000))} ج`}
                     </td>
 
                     {/* Net Profit */}
@@ -363,7 +394,8 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
                     </td>
 
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

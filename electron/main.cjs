@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 
 let mainWindow;
@@ -36,6 +37,23 @@ function startBackendServer() {
 }
 
 function createWindow() {
+  const isDev = !app.isPackaged;
+  const appPath = isDev ? app.getAppPath() : app.getAppPath().replace('app.asar', 'app.asar.unpacked');
+  
+  // Find valid icon across development, unpacked asar, and packaged resources
+  let resolvedIcon = path.join(__dirname, '../build/icon.ico');
+  if (!fs.existsSync(resolvedIcon)) {
+    const resourceIcon = path.join(process.resourcesPath, 'icon.ico');
+    if (fs.existsSync(resourceIcon)) {
+      resolvedIcon = resourceIcon;
+    } else {
+      const unpackedIcon = path.join(appPath, 'build/icon.ico');
+      if (fs.existsSync(unpackedIcon)) {
+        resolvedIcon = unpackedIcon;
+      }
+    }
+  }
+
   mainWindow = new BrowserWindow({
     width: 1320,
     height: 840,
@@ -43,7 +61,7 @@ function createWindow() {
     minHeight: 700,
     title: 'AMN Cash | إدارة معاملات فودافون كاش',
     backgroundColor: '#f3f5f8',
-    icon: path.join(__dirname, '../build/icon.ico'),
+    icon: resolvedIcon,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

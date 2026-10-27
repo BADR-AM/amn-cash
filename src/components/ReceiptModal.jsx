@@ -20,6 +20,11 @@ export default function ReceiptModal({ transaction, settings, isOpen, onClose })
   const isIncoming = transaction.type === 'INCOMING';
   const storeName = settings?.wallet_name || 'محل فودافون كاش - AMN';
   const storePhone = settings?.wallet_phone || '01012345678';
+  const feeRate = parseFloat(settings?.fee_per_1000) || 50;
+  const effectiveFee = transaction.feeEGP > 0 ? transaction.feeEGP : Math.round((transaction.amountEGP * feeRate) / 1000);
+  const payoutEGP = transaction.beneficiaryPayoutEGP !== undefined 
+    ? transaction.beneficiaryPayoutEGP 
+    : (isIncoming ? Math.max(0, transaction.amountEGP - effectiveFee) : transaction.amountEGP);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -63,11 +68,24 @@ export default function ReceiptModal({ transaction, settings, isOpen, onClose })
 
           {/* Key Amount Block */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center">
-            <span className="text-slate-500 text-[11px] font-bold block mb-0.5">مبلغ المعاملة</span>
+            <span className="text-slate-500 text-[11px] font-bold block mb-0.5">مبلغ المعاملة الإجمالي</span>
             <span className="text-3xl font-black text-slate-900 font-mono tracking-tight">
               {fmt(transaction.amountEGP)} <span className="text-sm font-bold text-slate-600">ج.م</span>
             </span>
           </div>
+
+          {/* Beneficiary Cash Handover Highlight Block */}
+          {isIncoming && (
+            <div className="bg-emerald-50 p-3.5 rounded-xl border-2 border-emerald-300 text-center space-y-1">
+              <span className="text-emerald-800 text-xs font-black block">صافي المبلغ المسلّم للمستفيد نقداً</span>
+              <span className="text-2xl font-black text-emerald-700 font-mono tracking-tight">
+                {fmt(payoutEGP)} <span className="text-xs font-bold">ج.م</span>
+              </span>
+              <span className="text-[10px] text-emerald-600 font-semibold block">
+                (تم خصم 5% مصاريف سحب: {fmt(effectiveFee)} ج)
+              </span>
+            </div>
+          )}
 
           {/* Detailed Line Items */}
           <div className="space-y-2 text-xs font-medium border-t border-b border-slate-100 py-3">
@@ -80,9 +98,15 @@ export default function ReceiptModal({ transaction, settings, isOpen, onClose })
               <span className="font-mono font-bold text-slate-900">{transaction.senderOrRecipient}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">رسوم الخدمة:</span>
-              <span className="font-bold text-slate-800">{fmt(transaction.feeEGP)} ج</span>
+              <span className="text-slate-500">مصاريف السحب (العمولة 5%):</span>
+              <span className="font-bold text-slate-800">{fmt(effectiveFee)} ج</span>
             </div>
+            {isIncoming && (
+              <div className="flex justify-between text-emerald-800 font-black">
+                <span>المبلغ المسلّم نقداً للمستفيد:</span>
+                <span className="font-mono text-sm">{fmt(payoutEGP)} ج</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-slate-500">تاريخ ووقت العملية:</span>
               <span className="font-mono font-bold text-slate-700 text-[11px]">{transaction.timestamp}</span>

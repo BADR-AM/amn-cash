@@ -43,10 +43,13 @@ export default function Reports({ transactions }) {
   });
 
   const exportCSV = () => {
-    const headers = 'رقم العملية,الوقت,الطرف الآخر,النوع,المبلغ,رسوم الخدمة,مصاريف السحب,الربح الصافي\n';
-    const rows = filtered.map(t => 
-      `"${t.referenceNumber}","${t.timestamp}","${t.senderOrRecipient}","${t.type === 'INCOMING' ? 'وارد' : 'سحب'}","${t.amountEGP}","${t.feeEGP}","${t.costEGP}","${t.profitEGP}"`
-    ).join('\n');
+    const headers = 'رقم العملية,الوقت,الطرف الآخر,النوع,المبلغ الإجمالي,المسلّم للمستفيد (كاش),رسوم الخدمة (5%),مصاريف السحب,الربح الصافي\n';
+    const rows = filtered.map(t => {
+      const payout = t.type === 'INCOMING' 
+        ? Math.max(0, t.amountEGP - (t.feeEGP || Math.round((t.amountEGP * 50) / 1000))) 
+        : t.amountEGP;
+      return `"${t.referenceNumber}","${t.timestamp}","${t.senderOrRecipient}","${t.type === 'INCOMING' ? 'وارد' : 'سحب'}","${t.amountEGP}","${payout}","${t.feeEGP}","${t.costEGP}","${t.profitEGP}"`;
+    }).join('\n');
     
     const blob = new Blob(["\uFEFF" + headers + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

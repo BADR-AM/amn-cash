@@ -25,7 +25,15 @@
       "dist/**/*",
       "electron/**/*",
       "server/**/*",
+      "build/icon.ico",
+      "build/icon.png",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      }
     ],
     "asarUnpack": [
       "dist/**/*",
@@ -45,12 +53,16 @@
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
+      "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
       "shortcutName": "AMN Cash",
       "uninstallDisplayName": "AMN Cash - إدارة فودافون كاش",
-      "runAfterFinish": true
+      "runAfterFinish": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
     }
   },
   "keywords": [

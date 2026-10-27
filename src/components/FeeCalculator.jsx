@@ -117,10 +117,21 @@ export default function FeeCalculator({ settings, onSaveSettings }) {
             </div>
 
             <div className="space-y-3">
+              {/* Cash Handover to Beneficiary */}
+              <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 flex justify-between items-center text-xs">
+                <span className="font-extrabold text-emerald-900 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+                  المبلغ المسلّم للمستفيد نقداً:
+                </span>
+                <span className="font-black text-emerald-800 text-base font-mono">
+                  {fmt(Math.max(0, calcResult.amount - calcResult.fee))} ج
+                </span>
+              </div>
+
               <div className="flex justify-between items-center text-xs">
                 <span className="font-medium text-slate-600 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
-                  إجمالي عمولة السحب (رسوم الخدمة):
+                  إجمالي عمولة السحب (رسوم الخدمة 5%):
                 </span>
                 <span className="font-extrabold text-slate-900 text-sm">{fmt(calcResult.fee)} ج</span>
               </div>

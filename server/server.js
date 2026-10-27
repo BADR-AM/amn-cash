@@ -164,21 +164,30 @@ app.get('/api/transactions', async (req, res) => {
     const rows = await allQuery(sql, params);
     
     // Map to friendly view model
-    const items = rows.map(r => ({
-      id: r.id,
-      eventId: r.event_id,
-      type: r.type,
-      amountEGP: r.amount_piasters / 100,
-      feeEGP: r.fee_piasters / 100,
-      costEGP: r.cost_piasters / 100,
-      profitEGP: r.profit_piasters / 100,
-      senderOrRecipient: r.sender_or_recipient,
-      referenceNumber: r.reference_number,
-      status: r.status,
-      timestamp: r.timestamp,
-      rawSms: r.raw_sms,
-      source: r.source
-    }));
+    const items = rows.map(r => {
+      const amountEGP = r.amount_piasters / 100;
+      const feeEGP = r.fee_piasters / 100;
+      // 5% cashout fee rule: 50 EGP per 1000 EGP
+      const estimatedFee = feeEGP > 0 ? feeEGP : Math.round((amountEGP * 50) / 1000);
+      const beneficiaryPayoutEGP = r.type === 'INCOMING' ? Math.max(0, amountEGP - estimatedFee) : amountEGP;
+
+      return {
+        id: r.id,
+        eventId: r.event_id,
+        type: r.type,
+        amountEGP,
+        feeEGP,
+        costEGP: r.cost_piasters / 100,
+        profitEGP: r.profit_piasters / 100,
+        beneficiaryPayoutEGP,
+        senderOrRecipient: r.sender_or_recipient,
+        referenceNumber: r.reference_number,
+        status: r.status,
+        timestamp: r.timestamp,
+        rawSms: r.raw_sms,
+        source: r.source
+      };
+    });
 
     res.json({ success: true, data: items });
   } catch (err) {
