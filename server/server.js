@@ -512,66 +512,127 @@ app.get('/api/devices', async (req, res) => {
   }
 });
 
-// Download Mobile App Landing Page for Phone Browsers via QR Code
-app.get('/download-app', (req, res) => {
+// Interactive Mobile Portal for Phone Browsers via QR Code: Choose between Download or Pair
+app.get(['/connect', '/download-app'], async (req, res) => {
   const localIp = getLocalIpAddresses();
+  const serverUrl = `http://${localIp}:5500`;
+  const deepLink = `amncash://pair?server=${encodeURIComponent(serverUrl)}`;
+
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>تحميل تطبيق AMN Cash لهواتف أندرويد</title>
+  <title>بوابة هاتف فودافون كاش - AMN Cash</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", sans-serif; }
-    body { background-color: #f3f5f8; color: #1e293b; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-    .card { background: white; max-width: 440px; width: 100%; border-radius: 28px; padding: 32px 24px; box-shadow: 0 20px 40px -15px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; text-align: center; }
-    .logo { width: 72px; height: 72px; background: #ca1535; border-radius: 20px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; font-size: 24px; box-shadow: 0 10px 20px rgba(202,21,53,0.25); }
-    h1 { font-size: 20px; font-weight: 900; color: #0f172a; margin-bottom: 6px; }
-    p.sub { font-size: 13px; color: #64748b; margin-bottom: 24px; line-height: 1.5; }
-    .btn { display: block; width: 100%; background: #ca1535; color: white; text-decoration: none; padding: 16px; border-radius: 18px; font-weight: 800; font-size: 16px; box-shadow: 0 8px 18px rgba(202,21,53,0.3); transition: all 0.2s; margin-bottom: 24px; }
-    .btn:active { transform: scale(0.97); }
-    .steps { background: #f8fafc; border-radius: 20px; padding: 18px; text-align: right; border: 1px solid #e2e8f0; margin-bottom: 20px; }
-    .step-title { font-size: 13px; font-weight: 800; color: #334155; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
-    .step-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; font-size: 12px; color: #475569; line-height: 1.5; }
-    .step-item:last-child { margin-bottom: 0; }
-    .step-num { width: 22px; height: 22px; background: #fee2e2; color: #ca1535; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; flex-shrink: 0; margin-top: 1px; }
+    body { background-color: #f3f5f8; color: #1e293b; padding: 16px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .card { background: white; max-width: 460px; width: 100%; border-radius: 28px; padding: 28px 20px; box-shadow: 0 20px 45px -15px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; text-align: center; }
+    .logo { width: 68px; height: 68px; background: #ca1535; border-radius: 20px; margin: 0 auto 14px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; font-size: 22px; box-shadow: 0 10px 20px rgba(202,21,53,0.22); }
+    h1 { font-size: 19px; font-weight: 900; color: #0f172a; margin-bottom: 4px; }
+    p.sub { font-size: 12px; color: #64748b; margin-bottom: 20px; line-height: 1.5; }
+    
+    .choice-container { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+    
+    /* Option 1: Pair & Activate (If already installed) */
+    .option-card-pair { background: #f0fdf4; border: 2px solid #86efac; border-radius: 22px; padding: 18px 16px; text-align: right; transition: all 0.2s; }
+    .option-title-pair { font-size: 14px; font-weight: 900; color: #166534; display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .option-desc-pair { font-size: 11px; color: #15803d; line-height: 1.5; margin-bottom: 12px; }
+    .btn-pair { display: block; width: 100%; background: #16a34a; color: white; text-decoration: none; padding: 13px; border-radius: 14px; font-weight: 800; font-size: 14px; text-align: center; box-shadow: 0 4px 12px rgba(22,163,74,0.25); border: none; cursor: pointer; }
+    .btn-pair:active { transform: scale(0.98); }
+
+    /* Option 2: Download APK (For new phones) */
+    .option-card-download { background: #fef2f2; border: 2px solid #fecaca; border-radius: 22px; padding: 18px 16px; text-align: right; transition: all 0.2s; }
+    .option-title-download { font-size: 14px; font-weight: 900; color: #991b1b; display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .option-desc-download { font-size: 11px; color: #b91c1c; line-height: 1.5; margin-bottom: 12px; }
+    .btn-download { display: block; width: 100%; background: #ca1535; color: white; text-decoration: none; padding: 13px; border-radius: 14px; font-weight: 800; font-size: 14px; text-align: center; box-shadow: 0 4px 12px rgba(202,21,53,0.25); border: none; }
+    .btn-download:active { transform: scale(0.98); }
+
+    .net-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 12px; font-size: 11px; text-align: right; margin-bottom: 16px; }
+    .net-row { display: flex; justify-content: space-between; align-items: center; font-mono; font-size: 11px; margin-top: 4px; }
+    .badge { display: inline-block; background: #ecfdf5; color: #059669; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid #a7f3d0; margin-bottom: 12px; }
+    .btn-copy { background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 3px 8px; font-size: 10px; font-weight: 700; cursor: pointer; }
+    .ping-result { margin-top: 8px; font-size: 11px; font-weight: bold; padding: 8px; border-radius: 10px; display: none; }
     .footer { font-size: 11px; color: #94a3b8; }
-    .badge { display: inline-block; background: #ecfdf5; color: #059669; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid #a7f3d0; margin-bottom: 16px; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="logo">AMN</div>
     <span class="badge">● متصل بالشبكة المحلية (${localIp})</span>
-    <h1>تطبيق AMN Cash Collector</h1>
-    <p class="sub">تطبيق الهاتف المخصص لالتقاط رسائل فودافون كاش ومزامنتها فورياً مع جهاز الكمبيوتر.</p>
-    
-    <a href="/api/download/apk" class="btn" id="dlBtn">📥 اضغط هنا لبدء التحميل (APK)</a>
+    <h1>بوابة هاتف AMN Cash</h1>
+    <p class="sub">اختر الإجراء المطلوب: تفعيل الاتصال إذا كان التطبيق لديك، أو تحميل نسخة جديدة للهاتف.</p>
 
-    <div class="steps">
-      <div class="step-title">📋 خطوات التثبيت السريعة:</div>
-      <div class="step-item">
-        <div class="step-num">1</div>
-        <div>عند ظهور تنبيه الأمان، اختر <strong>«تنزيل على أي حال (Download anyway)»</strong> لأن التطبيق آمن ومخصص لشبكتكم الداخلية.</div>
+    <div class="choice-container">
+      
+      <!-- Option 1: Activate & Pair Connection -->
+      <div class="option-card-pair">
+        <div class="option-title-pair">
+          <span>🔗 1. تفعيل وربط الهاتف بالنظام</span>
+          <span style="background:#dcfce7; padding:2px 8px; border-radius:8px; font-size:10px;">التطبيق مثبت مسبقاً</span>
+        </div>
+        <p class="option-desc-pair">اضغط هنا لفتح التطبيق على هاتفك وتفعيل استقبال رسائل فودافون كاش ومزامنتها فورياً مع جهاز الكمبيوتر.</p>
+        <a href="${deepLink}" class="btn-pair" id="pairBtn">تفعيل الاتصال وفتح التطبيق فوراً</a>
       </div>
-      <div class="step-item">
-        <div class="step-num">2</div>
-        <div>بعد انتهاء التحميل اضغط على الملف واختر <strong>«تثبيت (Install)»</strong>.</div>
+
+      <!-- Option 2: Download APK -->
+      <div class="option-card-download">
+        <div class="option-title-download">
+          <span>📥 2. تحميل وتثبيت التطبيق (APK)</span>
+          <span style="background:#fee2e2; padding:2px 8px; border-radius:8px; font-size:10px;">هاتف جديد / لأول مرة</span>
+        </div>
+        <p class="option-desc-download">اضغط هنا فقط إذا لم يكن التطبيق مثبتاً على هاتفك لتنزيل الحزمة (حجم الملف: 8.2 ميجابايت).</p>
+        <a href="/api/download/apk" class="btn-download">تحميل ملف التطبيق (Download APK)</a>
       </div>
-      <div class="step-item">
-        <div class="step-num">3</div>
-        <div>افتح التطبيق وامنحه صلاحية قراءة الرسائل، ثم امسح <strong>كود الربط (QR Code)</strong> المعروض على شاشة الكمبيوتر.</div>
+
+    </div>
+
+    <!-- LAN Server Details Box -->
+    <div class="net-box">
+      <div style="font-weight:bold; color:#334155; margin-bottom:4px;">معلومات الاتصال المباشر:</div>
+      <div class="net-row">
+        <span style="color:#64748b;">عنوان السيرفر:</span>
+        <span style="font-family:monospace; font-weight:bold; color:#ca1535; direction:ltr;">${serverUrl}</span>
       </div>
+      <div style="margin-top:8px; display:flex; gap:6px;">
+        <button class="btn-copy" onclick="copyServerUrl()" style="flex:1;">📋 نسخ رابط السيرفر</button>
+        <button class="btn-copy" onclick="pingServer()" style="flex:1; background:#f1f5f9;">📡 فحص جودة الاتصال</button>
+      </div>
+      <div id="pingBox" class="ping-result"></div>
     </div>
 
     <div class="footer">نظام إدارة ومتابعة معاملات فودافون كاش - AMN Cash v1.0</div>
   </div>
 
   <script>
-    // Automatically trigger download after 1.2 seconds
-    setTimeout(function() {
-      window.location.href = '/api/download/apk';
-    }, 1200);
+    function copyServerUrl() {
+      navigator.clipboard.writeText('${serverUrl}');
+      alert('تم نسخ عنوان السيرفر: ${serverUrl}');
+    }
+
+    async function pingServer() {
+      const box = document.getElementById('pingBox');
+      box.style.display = 'block';
+      box.style.background = '#fef9c3';
+      box.style.color = '#854d0e';
+      box.textContent = 'جاري قياس استجابة السيرفر...';
+      try {
+        const start = Date.now();
+        const res = await fetch('/api/settings');
+        const latency = Date.now() - start;
+        if (res.ok) {
+          box.style.background = '#dcfce7';
+          box.style.color = '#15803d';
+          box.textContent = '✅ الاتصال بالسيرفر ممتاز! سرعة الاستجابة: ' + latency + ' مللي ثانية.';
+        } else {
+          throw new Error('HTTP ' + res.status);
+        }
+      } catch (err) {
+        box.style.background = '#fee2e2';
+        box.style.color = '#b91c1c';
+        box.textContent = '❌ تعذر الاتصال، تأكد من أن الهاتف على نفس شبكة الواي فاي.';
+      }
+    }
   </script>
 </body>
 </html>`;

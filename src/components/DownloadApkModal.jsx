@@ -46,8 +46,8 @@ export default function DownloadApkModal({ isOpen, onClose }) {
               <Smartphone className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base text-slate-800">تحميل تطبيق الهاتف (Android APK)</h3>
-              <p className="text-xs text-slate-400 font-medium">عبر مسح كود الـ QR على نفس الشبكة المحلية</p>
+              <h3 className="font-extrabold text-base text-slate-800">بوابة هاتف فودافون كاش (QR Portal)</h3>
+              <p className="text-xs text-slate-400 font-medium">امسح الكود لاختيار: تفعيل الاتصال أو تحميل التطبيق</p>
             </div>
           </div>
           <button
@@ -73,23 +73,35 @@ export default function DownloadApkModal({ isOpen, onClose }) {
         <div className="flex flex-col items-center justify-center p-5 bg-slate-50 border-2 border-dashed border-red-200 rounded-3xl my-3 text-center">
           {loading ? (
             <div className="w-56 h-56 flex items-center justify-center text-slate-400 text-xs">
-              جاري توليد كود التحميل المباشر...
+              جاري تجهيز كود البوابة...
             </div>
           ) : downloadInfo?.qrCode ? (
             <>
               <img 
                 src={downloadInfo.qrCode} 
-                alt="Scan to Download APK" 
+                alt="Scan to Connect or Download" 
                 className="w-52 h-52 rounded-2xl shadow-sm border border-slate-200 bg-white p-2"
               />
               <p className="text-xs font-bold text-slate-700 mt-3 flex items-center gap-1.5">
                 <QrCode className="w-4 h-4 text-[#ca1535]" />
-                <span>امسح الكود بكاميرا الموبايل لبدء التحميل فوراً</span>
+                <span>امسح الكود بكاميرا الموبايل لفتح خيارات الربط أو التحميل</span>
               </p>
             </>
           ) : (
             <div className="text-xs text-red-600 font-bold">تعذر تحميل كود QR، يرجى التأكد من تشغيل السيرفر.</div>
           )}
+        </div>
+
+        {/* Choice Explanation Pills */}
+        <div className="grid grid-cols-2 gap-2 my-2 text-center text-[11px] font-bold">
+          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+            <span className="block font-black mb-0.5">🔗 تفعيل الاتصال</span>
+            <span className="text-[10px] text-emerald-600 font-medium">إذا كان التطبيق مثبتاً بالفعل</span>
+          </div>
+          <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-800">
+            <span className="block font-black mb-0.5">📥 تحميل التطبيق</span>
+            <span className="text-[10px] text-red-600 font-medium">للهواتف الجديدة فقط</span>
+          </div>
         </div>
 
         {/* Direct Link Box */}
