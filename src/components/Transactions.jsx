@@ -1,316 +1,318 @@
 import React, { useState } from 'react';
 import { 
   Search, 
-  ArrowDownLeft, 
-  ArrowUpRight, 
+  Calculator, 
   Filter, 
   PlusCircle, 
   Eye, 
+  Printer, 
+  Edit3, 
   CheckCircle2, 
-  FileText, 
-  Download,
-  Printer,
+  Clock, 
+  DollarSign, 
+  Sparkles,
   X
 } from 'lucide-react';
 import ReceiptModal from './ReceiptModal.jsx';
 
-export default function Transactions({ transactions, settings, onNewTransaction, onRefresh }) {
-  const [filterType, setFilterType] = useState('ALL');
+export default function Transactions({ transactions = [], settings, onRefresh, onNavigateToFees }) {
+  const [filterType, setFilterType] = useState('ALL'); // 'ALL', 'WITHDRAWAL', 'INCOMING'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTx, setSelectedTx] = useState(null);
   const [receiptTx, setReceiptTx] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // Form state for manual transaction
-  const [manualType, setManualType] = useState('INCOMING');
-  const [manualAmount, setManualAmount] = useState('');
-  const [manualPhone, setManualPhone] = useState('');
-  const [manualRef, setManualRef] = useState('');
+  // Embedded Calculator State matching Image 3
+  const [calcAmount, setCalcAmount] = useState('5000');
+  const [calcResult, setCalcResult] = useState({ fee: 250, cost: 50, profit: 200 });
 
-  const fmt = (num) => {
-    return Number(num || 0).toLocaleString('en-US', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    });
+  const feeRate = parseFloat(settings?.fee_per_1000) || 50;
+  const costRate = parseFloat(settings?.cost_per_1000) || 10;
+  const profitRate = feeRate - costRate;
+
+  const handleCalculate = () => {
+    const val = parseFloat(calcAmount) || 0;
+    const fee = Math.round((val * feeRate) / 1000);
+    const cost = Math.round((val * costRate) / 1000);
+    setCalcResult({ fee, cost, profit: fee - cost });
   };
 
-  const filtered = transactions.filter((tx) => {
-    if (filterType !== 'ALL' && tx.type !== filterType) return false;
+  const fmt = (num) => {
+    return Number(num || 0).toLocaleString('en-US');
+  };
+
+  // Sample or real transactions matching Image 3
+  const displayItems = transactions.filter((tx) => {
+    if (filterType === 'WITHDRAWAL' && tx.type !== 'WITHDRAWAL') return false;
+    if (filterType === 'INCOMING' && tx.type !== 'INCOMING') return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchPhone = tx.senderOrRecipient?.toLowerCase().includes(q);
-      const matchRef = tx.referenceNumber?.toLowerCase().includes(q);
-      const matchAmount = String(tx.amountEGP).includes(q);
-      return matchPhone || matchRef || matchAmount;
+      return (
+        tx.senderOrRecipient?.toLowerCase().includes(q) ||
+        tx.referenceNumber?.toLowerCase().includes(q) ||
+        String(tx.amountEGP).includes(q)
+      );
     }
     return true;
   });
 
-  const handleManualSubmit = async (e) => {
-    e.preventDefault();
-    if (!manualAmount || parseFloat(manualAmount) <= 0) return;
-
-    try {
-      const simulatedText = manualType === 'INCOMING'
-        ? `تم استلام مبلغ ${manualAmount} جنيه من رقم ${manualPhone || '01000000000'} رصيدك الحالي هو 20,000.00 جنيه رقم العملية ${manualRef || Date.now().toString().slice(-8)}`
-        : `تم سحب مبلغ ${manualAmount} جنيه من محفظتك فودافون كاش رقم العملية ${manualRef || Date.now().toString().slice(-8)}`;
-
-      await fetch('/api/sms/inbox', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          smsText: simulatedText,
-          deviceId: 'manual_desktop_entry'
-        })
-      });
-
-      setIsAddModalOpen(false);
-      setManualAmount('');
-      setManualPhone('');
-      setManualRef('');
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      alert('خطأ في إضافة المعاملة: ' + err.message);
-    }
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Top Filter and Actions Bar */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Search Input */}
-        <div className="relative w-full md:w-96">
-          <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="بحث برقم الهاتف، رقم العملية، أو المبلغ..."
-            className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-[#ca1535] focus:bg-white transition-all text-right"
-          />
+    <div className="space-y-6 text-right select-none">
+      
+      {/* 1. Header & Filter Pills Matching Image 3 */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight">المعاملات والحسابات المالية</h2>
+          <p className="text-xs font-semibold text-slate-500 mt-0.5">عرض جميع المعاملات وحساب الأرباح والمصاريف</p>
         </div>
 
-        {/* Filters and Add Button */}
-        <div className="flex items-center gap-2.5 w-full md:w-auto justify-end flex-wrap">
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
-            <button
-              onClick={() => setFilterType('ALL')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                filterType === 'ALL' ? 'bg-[#ca1535] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              الكل
-            </button>
-            <button
-              onClick={() => setFilterType('INCOMING')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                filterType === 'INCOMING' ? 'bg-[#ca1535] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              وارد فقط
-            </button>
-            <button
-              onClick={() => setFilterType('WITHDRAWAL')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                filterType === 'WITHDRAWAL' ? 'bg-[#ca1535] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              سحب فقط
-            </button>
-          </div>
+        {/* Filter Pills Matching Image 3 */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setFilterType('ALL')}
+            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
+              filterType === 'ALL'
+                ? 'bg-[#ca1535] text-white shadow-md shadow-red-900/10'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            جميع المعاملات
+          </button>
+
+          <button
+            onClick={() => setFilterType('WITHDRAWAL')}
+            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
+              filterType === 'WITHDRAWAL'
+                ? 'bg-[#ca1535] text-white shadow-md'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            السحب فقط
+          </button>
+
+          <button
+            onClick={() => setFilterType('INCOMING')}
+            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all ${
+              filterType === 'INCOMING'
+                ? 'bg-[#ca1535] text-white shadow-md'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            الإيداع فقط
+          </button>
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 bg-[#ca1535] hover:bg-[#a70d29] text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md shadow-red-900/20 transition-transform active:scale-95"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold"
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>تسجيل معاملة يدوياً</span>
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <span>تسجيل معاملة +</span>
           </button>
         </div>
       </div>
 
-      {/* Transactions Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* 2. Embedded Fee Calculator Card Matching Image 3 Middle Screen */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-sm space-y-5">
+        
+        <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+          <div className="w-7 h-7 rounded-lg bg-red-100 text-[#ca1535] flex items-center justify-center font-bold">
+            <Calculator className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="font-extrabold text-sm text-slate-800">حاسبة عمولة السحب والربح الصافي</h3>
+            <p className="text-[11px] text-slate-400 font-medium">احسب تكاليف وأرباح أي معاملة قبل تنفيذها</p>
+          </div>
+        </div>
+
+        {/* Input & Calculate Action */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+          
+          <div className="md:col-span-5 space-y-3">
+            <div className="relative">
+              <span className="text-[11px] font-bold text-slate-500 block mb-1">المبلغ (جنيه)</span>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={calcAmount}
+                  onChange={(e) => setCalcAmount(e.target.value)}
+                  placeholder="5000"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-black text-slate-900 focus:outline-none focus:border-[#ca1535] text-right font-mono"
+                />
+                <DollarSign className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
+            </div>
+
+            <button
+              onClick={handleCalculate}
+              className="w-full py-3 bg-[#ca1535] hover:bg-[#a70d29] text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-95"
+            >
+              <Calculator className="w-4 h-4" />
+              <span>احسب الآن</span>
+            </button>
+          </div>
+
+          {/* Result Box (Matching Image 3: نتيجة الحساب (مثال)) */}
+          <div className="md:col-span-7 bg-[#fffaf5] border border-amber-200/80 rounded-2xl p-4.5 space-y-3">
+            <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+              <span className="text-xs font-extrabold text-slate-700">نتيجة الحساب (لمبلغ {fmt(calcAmount)} ج)</span>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600 flex items-center gap-2 font-medium">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                  إجمالي عمولة السحب:
+                </span>
+                <span className="font-extrabold text-slate-900 font-mono">{fmt(calcResult.fee)} ج</span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600 flex items-center gap-2 font-medium">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                  إجمالي مصاريف الماكينة:
+                </span>
+                <span className="font-extrabold text-amber-800 font-mono">{fmt(calcResult.cost)} ج</span>
+              </div>
+
+              <div className="pt-2 border-t border-amber-200/70 flex justify-between items-center">
+                <span className="font-black text-emerald-800 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                  الربح الصافي:
+                </span>
+                <span className="text-xl font-black text-emerald-700 font-mono">
+                  {fmt(calcResult.profit)} ج
+                </span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Current Active Rule Footnote Matching Image 3 */}
+        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-4 text-slate-600 font-medium flex-wrap">
+            <span className="font-bold text-slate-700">الإعدادات المستخدمة في الحساب:</span>
+            <span>مصاريف السحب لكل 1000 جنيه: <strong className="text-slate-900 font-bold">{feeRate} ج</strong></span>
+            <span>• مصاريف سحبنا من الماكينة: <strong className="text-slate-900 font-bold">{costRate} ج</strong></span>
+            <span>• الربح الصافي لكل 1000 جنيه: <strong className="text-emerald-700 font-bold">{profitRate} ج</strong></span>
+          </div>
+
+          <button
+            onClick={onNavigateToFees}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[#ca1535] hover:bg-red-50 font-bold text-xs border border-red-200 transition-colors shrink-0"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            <span>تعديل القيم</span>
+          </button>
+        </div>
+
+      </div>
+
+      {/* 3. Search Bar Matching Image 3 */}
+      <div className="relative">
+        <Search className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="بحث عن عميل أو رقم معاملة أو مبلغ..."
+          className="w-full pl-4 pr-11 py-3 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-[#ca1535] text-right shadow-sm"
+        />
+      </div>
+
+      {/* 4. Transactions List Table Matching Image 3 */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+        <div className="p-4 px-6 border-b border-slate-100 flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-400">إجمالي: {displayItems.length} عملية</span>
+          <h3 className="font-extrabold text-sm text-slate-800">قائمة المعاملات</h3>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-right text-xs">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+            <thead className="bg-slate-50/70 text-slate-500 font-bold border-b border-slate-200">
               <tr>
-                <th className="py-4 px-5">رقم العملية</th>
-                <th className="py-4 px-5">الوقت والتاريخ</th>
-                <th className="py-4 px-5">العميل / الطرف الآخر</th>
-                <th className="py-4 px-5">النوع</th>
-                <th className="py-4 px-5">المبلغ</th>
-                <th className="py-4 px-5">رسوم الخدمة</th>
-                <th className="py-4 px-5">مصاريف السحب</th>
-                <th className="py-4 px-5">الربح الصافي</th>
-                <th className="py-4 px-5 text-center">الحالة</th>
-                <th className="py-4 px-5 text-center">تفاصيل</th>
+                <th className="py-3 px-5">العميل</th>
+                <th className="py-3 px-5">المبلغ</th>
+                <th className="py-3 px-5">العمولة</th>
+                <th className="py-3 px-5">الصافي</th>
+                <th className="py-3 px-5">التاريخ والوقت</th>
+                <th className="py-3 px-5 text-center">الحالة</th>
+                <th className="py-3 px-5 text-center">إجراءات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
-              {filtered.length === 0 ? (
+              {displayItems.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-400">
-                    لا توجد معاملات مطابقة لمعايير البحث
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    لا توجد معاملات مطابقة للبحث
                   </td>
                 </tr>
               ) : (
-                filtered.map((tx) => {
-                  const isIncoming = tx.type === 'INCOMING';
-                  return (
-                    <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3.5 px-5 font-mono text-slate-700 font-bold text-[11px]">
-                        {tx.referenceNumber || `TRX-${tx.id}`}
-                      </td>
-                      <td className="py-3.5 px-5 text-slate-600 font-mono text-[11px] whitespace-nowrap">
-                        {tx.timestamp}
-                      </td>
-                      <td className="py-3.5 px-5 text-slate-900 font-bold font-mono">
-                        {tx.senderOrRecipient}
-                      </td>
-                      <td className="py-3.5 px-5 whitespace-nowrap">
-                        {isIncoming ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold text-[11px]">
-                            <ArrowDownLeft className="w-3.5 h-3.5" />
-                            وارد
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 text-red-700 font-bold text-[11px]">
-                            <ArrowUpRight className="w-3.5 h-3.5" />
-                            سحب
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-5 font-black text-slate-900 whitespace-nowrap">
-                        {fmt(tx.amountEGP)} ج
-                      </td>
-                      <td className="py-3.5 px-5 font-bold text-slate-700 whitespace-nowrap">
-                        {tx.feeEGP > 0 ? `${fmt(tx.feeEGP)} ج` : '−'}
-                      </td>
-                      <td className="py-3.5 px-5 font-bold text-amber-700 whitespace-nowrap">
-                        {tx.costEGP > 0 ? `${fmt(tx.costEGP)} ج` : '−'}
-                      </td>
-                      <td className="py-3.5 px-5 font-black text-emerald-700 whitespace-nowrap">
-                        {tx.profitEGP > 0 ? `${fmt(tx.profitEGP)} ج` : '−'}
-                      </td>
-                      <td className="py-3.5 px-5 text-center">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px]">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          مكتملة
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-5 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => setReceiptTx(tx)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                            title="طباعة إيصال للعملية"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setSelectedTx(tx)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-[#ca1535] hover:bg-red-50 transition-colors"
-                            title="عرض تفاصيل الرسالة"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
+                displayItems.map((tx) => (
+                  <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
+                    
+                    {/* Customer */}
+                    <td className="py-3.5 px-5 font-bold text-slate-900 font-mono">
+                      {tx.senderOrRecipient}
+                    </td>
+
+                    {/* Amount */}
+                    <td className="py-3.5 px-5 font-black text-slate-900 whitespace-nowrap">
+                      {fmt(tx.amountEGP)} ج
+                    </td>
+
+                    {/* Fee */}
+                    <td className="py-3.5 px-5 font-bold text-slate-700 whitespace-nowrap">
+                      {tx.feeEGP > 0 ? `${fmt(tx.feeEGP)} ج` : '−'}
+                    </td>
+
+                    {/* Net Profit */}
+                    <td className="py-3.5 px-5 font-black text-emerald-700 whitespace-nowrap">
+                      {tx.profitEGP > 0 ? `${fmt(tx.profitEGP)} ج` : '−'}
+                    </td>
+
+                    {/* Date */}
+                    <td className="py-3.5 px-5 text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                      {tx.timestamp}
+                    </td>
+
+                    {/* Status Pill Matching Image 3 */}
+                    <td className="py-3.5 px-5 text-center">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>مكتملة</span>
+                      </span>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-3.5 px-5 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => setReceiptTx(tx)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                          title="طباعة إيصال"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setSelectedTx(tx)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-[#ca1535] hover:bg-red-50 transition-colors"
+                          title="عرض التفاصيل"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Transaction Details Modal */}
-      {selectedTx && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 text-right animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <h3 className="font-extrabold text-base text-slate-900">تفاصيل المعاملة</h3>
-              <button
-                onClick={() => setSelectedTx(null)}
-                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="py-4 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <div>
-                  <span className="text-slate-400 font-medium block mb-1">المبلغ الإجمالي</span>
-                  <strong className="text-xl font-black text-slate-900">{fmt(selectedTx.amountEGP)} ج</strong>
-                </div>
-                <div>
-                  <span className="text-slate-400 font-medium block mb-1">الربح الصافي</span>
-                  <strong className="text-xl font-black text-emerald-600">{fmt(selectedTx.profitEGP)} ج</strong>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between py-1.5 border-b border-slate-100">
-                  <span className="text-slate-500 font-medium">الطرف الآخر:</span>
-                  <span className="font-bold text-slate-800 font-mono">{selectedTx.senderOrRecipient}</span>
-                </div>
-                <div className="flex justify-between py-1.5 border-b border-slate-100">
-                  <span className="text-slate-500 font-medium">رقم العملية المرجعي:</span>
-                  <span className="font-bold text-slate-800 font-mono">{selectedTx.referenceNumber}</span>
-                </div>
-                <div className="flex justify-between py-1.5 border-b border-slate-100">
-                  <span className="text-slate-500 font-medium">وقت الاستلام:</span>
-                  <span className="font-bold text-slate-800 font-mono">{selectedTx.timestamp}</span>
-                </div>
-                <div className="flex justify-between py-1.5 border-b border-slate-100">
-                  <span className="text-slate-500 font-medium">رسوم الخدمة:</span>
-                  <span className="font-bold text-slate-800">{fmt(selectedTx.feeEGP)} ج</span>
-                </div>
-                <div className="flex justify-between py-1.5 border-b border-slate-100">
-                  <span className="text-slate-500 font-medium">مصاريف السحب من الماكينة:</span>
-                  <span className="font-bold text-slate-800">{fmt(selectedTx.costEGP)} ج</span>
-                </div>
-              </div>
-
-              {selectedTx.rawSms && (
-                <div className="mt-3">
-                  <span className="text-slate-500 font-bold block mb-1.5 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-slate-400" />
-                    نص رسالة الـ SMS الأصلية:
-                  </span>
-                  <div className="bg-slate-900 text-slate-200 p-3.5 rounded-xl text-xs font-mono leading-relaxed select-text">
-                    {selectedTx.rawSms}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="pt-2 flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setReceiptTx(selectedTx);
-                  setSelectedTx(null);
-                }}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                <span>طباعة إيصال معتمد</span>
-              </button>
-              <button
-                onClick={() => setSelectedTx(null)}
-                className="py-2.5 px-6 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
-              >
-                إغلاق
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Printable Receipt Modal */}
+      {/* Details & Receipt Modals */}
       <ReceiptModal 
         transaction={receiptTx}
         settings={settings}
@@ -318,104 +320,6 @@ export default function Transactions({ transactions, settings, onNewTransaction,
         onClose={() => setReceiptTx(null)}
       />
 
-      {/* Manual Add Transaction Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-right animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <h3 className="font-extrabold text-base text-slate-900">تسجيل معاملة يدوياً</h3>
-              <button
-                onClick={() => setIsAddModalOpen(false)}
-                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleManualSubmit} className="py-4 space-y-4 text-xs font-medium">
-              <div>
-                <label className="block text-slate-600 mb-1.5 font-bold">نوع المعاملة</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setManualType('INCOMING')}
-                    className={`py-2 rounded-xl font-bold border transition-all ${
-                      manualType === 'INCOMING'
-                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    وارد (استلام كاش)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setManualType('WITHDRAWAL')}
-                    className={`py-2 rounded-xl font-bold border transition-all ${
-                      manualType === 'WITHDRAWAL'
-                        ? 'bg-red-500 text-white border-red-500 shadow-sm'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    سحب كاش
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-600 mb-1.5 font-bold">المبلغ بالجنيه</label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  step="any"
-                  value={manualAmount}
-                  onChange={(e) => setManualAmount(e.target.value)}
-                  placeholder="مثال: 1000"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:border-[#ca1535] text-right font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-600 mb-1.5 font-bold">رقم الهاتف (العميل)</label>
-                <input
-                  type="text"
-                  value={manualPhone}
-                  onChange={(e) => setManualPhone(e.target.value)}
-                  placeholder="010xxxxxxxx"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:border-[#ca1535] text-right"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-600 mb-1.5 font-bold">رقم المرجع / العملية (اختياري)</label>
-                <input
-                  type="text"
-                  value={manualRef}
-                  onChange={(e) => setManualRef(e.target.value)}
-                  placeholder="مثال: 948301"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:border-[#ca1535] text-right"
-                />
-              </div>
-
-              <div className="pt-2 flex items-center gap-2">
-                <button
-                  type="submit"
-                  className="flex-1 py-3 bg-[#ca1535] hover:bg-[#a70d29] text-white font-bold rounded-xl shadow-md transition-all active:scale-95"
-                >
-                  حفظ المعاملة
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
-                >
-                  إلغاء
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

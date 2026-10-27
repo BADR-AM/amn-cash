@@ -3,11 +3,12 @@ import {
   Home, 
   ArrowLeftRight, 
   BarChart3, 
-  Calculator, 
+  Coins, 
   Smartphone, 
   Settings, 
+  Clock, 
   Radio, 
-  SendHorizontal
+  SendHorizontal 
 } from 'lucide-react';
 
 export default function Sidebar({ currentTab, setCurrentTab, onOpenSimulator, isOnline, lastSync }) {
@@ -15,27 +16,32 @@ export default function Sidebar({ currentTab, setCurrentTab, onOpenSimulator, is
     { id: 'dashboard', label: 'الرئيسية', icon: Home },
     { id: 'transactions', label: 'المعاملات', icon: ArrowLeftRight },
     { id: 'reports', label: 'التقارير', icon: BarChart3 },
-    { id: 'fees', label: 'المصاريف والربح', icon: Calculator },
+    { id: 'fees', label: 'المصاريف والربح', icon: Coins },
     { id: 'devices', label: 'الأجهزة والاتصال', icon: Smartphone },
     { id: 'settings', label: 'الإعدادات', icon: Settings },
   ];
 
   return (
-    <aside className="w-64 bg-gradient-to-b from-[#ca1535] via-[#a70d29] to-[#751224] text-white flex flex-col justify-between shrink-0 shadow-2xl z-20">
+    <aside className="w-56 bg-gradient-to-b from-[#ca1535] via-[#a70d29] to-[#751224] text-white flex flex-col justify-between shrink-0 shadow-2xl z-20 select-none relative overflow-hidden">
+      
+      {/* Subtle Background Pattern Wave */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+
       <div>
-        {/* Brand Header */}
-        <div className="p-6 border-b border-white/10 flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-white text-[#ca1535] flex items-center justify-center font-black text-2xl shadow-lg shadow-black/20">
-            <span className="tracking-tighter">AMN</span>
+        {/* Brand Header Matching Image 1 */}
+        <div className="pt-6 pb-5 px-5 flex flex-col items-center text-center border-b border-white/10">
+          {/* Circular Vodafone/AMN Logo Mark */}
+          <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-[#ca1535] shadow-lg mb-2 p-1">
+            <div className="w-full h-full rounded-full border-2 border-[#ca1535] flex items-center justify-center font-black text-xl tracking-tighter">
+              VF
+            </div>
           </div>
-          <div>
-            <h1 className="font-extrabold text-lg leading-tight tracking-wide text-white">AMN Cash</h1>
-            <p className="text-xs text-red-100 font-medium opacity-90">إدارة معاملات فودافون كاش</p>
-          </div>
+          <strong className="font-extrabold text-base tracking-wide text-white block">vodafone cash</strong>
+          <span className="text-[10px] text-red-200 block font-medium">AMN Manager</span>
         </div>
 
         {/* Navigation Items */}
-        <nav className="p-4 space-y-1.5">
+        <nav className="p-3 space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const active = currentTab === item.id;
@@ -43,13 +49,13 @@ export default function Sidebar({ currentTab, setCurrentTab, onOpenSimulator, is
               <button
                 key={item.id}
                 onClick={() => setCurrentTab(item.id)}
-                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-200 text-right ${
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-right ${
                   active
-                    ? 'bg-white text-[#ca1535] shadow-lg shadow-black/10 font-bold translate-x-[-2px]'
+                    ? 'bg-white text-[#ca1535] shadow-md shadow-black/10 font-extrabold translate-x-[-1px]'
                     : 'text-red-100 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                <Icon className={`w-5 h-5 shrink-0 ${active ? 'text-[#ca1535]' : 'text-red-200'}`} />
+                <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-[#ca1535]' : 'text-red-200'}`} />
                 <span>{item.label}</span>
               </button>
             );
@@ -57,35 +63,29 @@ export default function Sidebar({ currentTab, setCurrentTab, onOpenSimulator, is
         </nav>
       </div>
 
-      {/* Simulator Quick Action & Live Status Footer */}
-      <div className="p-4 space-y-3 border-t border-white/10 bg-black/10">
-        <button
-          onClick={onOpenSimulator}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-bold text-xs shadow-md shadow-emerald-900/30 transition-transform active:scale-95"
-        >
-          <SendHorizontal className="w-4 h-4" />
-          <span>محاكي الرسائل (SMS Test)</span>
-        </button>
-
-        <div className="bg-black/25 rounded-xl p-3 border border-white/10 text-xs text-red-100 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 font-medium">
-              <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-400 pulse-green' : 'bg-red-400'}`}></span>
-              {isOnline ? 'النظام يعمل بنجاح' : 'جاري الاتصال...'}
-            </span>
-            <span className="text-[10px] bg-white/15 px-2 py-0.5 rounded-full font-mono">v1.0</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-[11px] text-red-200">
-            <Radio className="w-3.5 h-3.5 text-emerald-400" />
-            <span>متصل بالتطبيق المحمول</span>
-          </div>
-
-          <div className="text-[10px] text-red-300 font-mono">
-            آخر مزامنة: {lastSync || 'منذ ثوانٍ'}
-          </div>
+      {/* Bottom Live Status Matching Image 1 Exactly */}
+      <div className="p-3.5 m-3 rounded-2xl bg-black/20 border border-white/10 text-xs text-red-100 space-y-2.5 backdrop-blur-sm">
+        
+        {/* Green Running Dot */}
+        <div className="flex items-center gap-2 font-bold text-white text-[11px]">
+          <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 pulse-green' : 'bg-red-400'}`}></span>
+          <span>{isOnline ? 'النظام يعمل' : 'جاري الاتصال...'}</span>
         </div>
+
+        {/* Connected to Mobile */}
+        <div className="flex items-center gap-2 text-[11px] text-red-200">
+          <Smartphone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <span>متصل بالتطبيق المحمول</span>
+        </div>
+
+        {/* Last Sync Time */}
+        <div className="flex items-center gap-2 text-[10px] text-red-300 font-mono pt-1 border-t border-white/10">
+          <Clock className="w-3 h-3 text-red-300 shrink-0" />
+          <span>آخر مزامنة: {lastSync || 'منذ 10 ثواني'}</span>
+        </div>
+
       </div>
+
     </aside>
   );
 }
