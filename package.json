@@ -29,6 +29,12 @@
       "build/icon.png",
       "package.json"
     ],
+    "extraFiles": [
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
     "extraResources": [
       {
         "from": "build/icon.ico",
