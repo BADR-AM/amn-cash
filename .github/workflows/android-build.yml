@@ -5,6 +5,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,15 +22,18 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Gradle
+    - name: Setup Gradle 8.6
       uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.6'
 
-    - name: Grant execute permission for gradlew if present
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Generate Gradle Wrapper
       run: |
         cd android
-        if [ ! -f gradlew ]; then
-          gradle wrapper
-        fi
+        gradle wrapper --gradle-version 8.6
         chmod +x gradlew
 
     - name: Build Debug APK
@@ -40,3 +46,18 @@ jobs:
       with:
         name: AMN-Cash-Collector-Debug-APK
         path: android/app/build/outputs/apk/debug/*.apk
+
+    - name: Release APK
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v1.0.0-android
+        name: "AMN Cash Android Collector APK v1.0.0"
+        body: |
+          ### تطبيق الأندرويد المساعد AMN Cash Android Collector
+          - التقاط رسائل فودافون كاش ومزامنتها لحظياً مع حاسوب الويندوز
+          - فلترة كاملة لرسائل OTP والرموز السرية لحماية الخصوصية
+          - توقيع رقمي مشفر HMAC-SHA256
+          - تشغيل في الخلفية Foreground Service
+        files: android/app/build/outputs/apk/debug/*.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
