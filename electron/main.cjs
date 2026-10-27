@@ -6,10 +6,28 @@ let mainWindow;
 let serverProcess;
 
 function startBackendServer() {
-  const serverScript = path.join(__dirname, '../server/server.js');
-  serverProcess = spawn('node', [serverScript], {
-    stdio: 'inherit',
-    env: { ...process.env, PORT: 5500 }
+  const isDev = !app.isPackaged;
+  const appPath = app.getAppPath();
+  const serverScript = path.join(appPath, 'server/server.js');
+  
+  // Use Electron's own built-in Node.js runtime so NO external Node.js installation is needed!
+  const nodeBinary = isDev ? 'node' : process.execPath;
+  const userDataPath = app.getPath('userData');
+  const dataDir = path.join(userDataPath, 'data');
+
+  const env = {
+    ...process.env,
+    PORT: '5500',
+    NODE_ENV: isDev ? 'development' : 'production',
+    IS_PACKAGED: isDev ? 'false' : 'true',
+    AMN_DATA_DIR: dataDir,
+    ELECTRON_RUN_AS_NODE: '1'
+  };
+
+  serverProcess = spawn(nodeBinary, [serverScript], {
+    stdio: 'ignore', // Keep clean, no black cmd popup in production
+    env,
+    windowsHide: true
   });
 
   serverProcess.on('error', (err) => {

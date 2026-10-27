@@ -27,6 +27,10 @@
       "server/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "server/**/*",
+      "**/node_modules/sqlite3/**/*"
+    ],
     "win": {
       "target": [
         {

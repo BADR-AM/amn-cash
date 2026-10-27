@@ -6,7 +6,13 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dataDir = path.resolve(__dirname, '../data');
+// Ensure writable path in production (AppData) or local project folder in development
+const isProd = process.env.NODE_ENV === 'production' || process.env.IS_PACKAGED === 'true';
+const dataDir = process.env.AMN_DATA_DIR || 
+  (isProd && process.env.APPDATA 
+    ? path.join(process.env.APPDATA, 'AMN Cash', 'data') 
+    : path.resolve(__dirname, '../data'));
+
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
