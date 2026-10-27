@@ -34,7 +34,7 @@ export default function TitleBar({ showPhone, setShowPhone, onOpenDownloadModal 
               ? 'bg-white text-[#ca1535] shadow-sm' 
               : 'bg-black/20 text-white hover:bg-black/30'
           }`}
-          title="معاينة شاشة هاتف الأندرويد ومحاكاة الرسائل الحية"
+          title="معاينة شاشة هاتف الأندرويد المساعد"
         >
           <Smartphone className="w-3.5 h-3.5" />
           <span>{showPhone ? 'إخفاء شاشة الموبايل' : 'عرض شاشة الموبايل المباشرة'}</span>

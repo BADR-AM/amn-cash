@@ -49,18 +49,18 @@ function playPaymentSound() {
 export default function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [period, setPeriod] = useState('week');
-  const [showPhone, setShowPhone] = useState(true); // Matches Image 1 side-by-side view
+  const [showPhone, setShowPhone] = useState(false); // Clean desktop dashboard by default
   
   const [stats, setStats] = useState({
-    totalIncomingEGP: 85200,
-    totalWithdrawalsEGP: 71000,
-    totalFeesEGP: 3550,
-    totalCostEGP: 710,
-    totalProfitEGP: 2840,
-    totalCount: 312,
-    incomingCount: 296,
-    withdrawalCount: 12,
-    otherCount: 4,
+    totalIncomingEGP: 0,
+    totalWithdrawalsEGP: 0,
+    totalFeesEGP: 0,
+    totalCostEGP: 0,
+    totalProfitEGP: 0,
+    totalCount: 0,
+    incomingCount: 0,
+    withdrawalCount: 0,
+    otherCount: 0,
   });
 
   const [transactions, setTransactions] = useState([]);
@@ -84,8 +84,8 @@ export default function App() {
 
       const txRes = await fetch('/api/transactions?limit=100');
       const txJson = await txRes.json();
-      if (txJson.success && txJson.data.length > 0) {
-        setTransactions(txJson.data);
+      if (txJson.success) {
+        setTransactions(txJson.data || []);
       }
 
       const setRes = await fetch('/api/settings');

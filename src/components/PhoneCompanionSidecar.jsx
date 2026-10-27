@@ -153,7 +153,7 @@ export default function PhoneCompanionSidecar({ isConnected = true, onSendTestSm
           className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-95"
         >
           <Send className="w-3.5 h-3.5 text-emerald-400" />
-          <span>{sendingTest ? 'جاري الإرسال...' : 'إرسال SMS تجريبي للويندوز'}</span>
+          <span>{sendingTest ? 'جاري الإرسال...' : 'فحص استقبال رسالة كاش'}</span>
         </button>
 
         {/* Toggle Service Button (Matching Image 1: إيقاف الخدمة) */}

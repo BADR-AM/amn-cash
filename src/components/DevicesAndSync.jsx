@@ -315,18 +315,17 @@ export default function DevicesAndSync({ onOpenSimulator }) {
           </div>
         </div>
 
-        {/* Quick Simulator Launcher */}
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-3xl p-6 shadow-md flex items-center justify-between">
-          <div>
-            <h4 className="font-extrabold text-sm text-white">هل ترغب في اختبار الاستقبال دون هاتف؟</h4>
-            <p className="text-xs text-slate-300 mt-1">استخدم محاكي الرسائل المدمج لإرسال رسائل فودافون كاش تجريبية فوراً</p>
+        {/* Production Operations Guide */}
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-3xl p-6 shadow-md space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <h4 className="font-extrabold text-sm text-white">إرشادات التشغيل الفعلي في المحل</h4>
           </div>
-          <button
-            onClick={onOpenSimulator}
-            className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-md transition-all active:scale-95 whitespace-nowrap"
-          >
-            فتح محاكي الرسائل
-          </button>
+          <div className="text-xs text-slate-300 space-y-1.5 leading-relaxed font-medium">
+            <p>1. تأكد من اتصال هاتف فودافون كاش وحاسوب الويندوز بنفس شبكة الـ Wi-Fi المحلية للمحل.</p>
+            <p>2. امسح كود الـ QR من شاشة الهاتف لتحميل وتثبيت التطبيق وتفعيل أذونات الرسائل (SMS).</p>
+            <p>3. فور وصول أي رسالة تحويل أو سحب كاش على الشريحة، سيتم رصدها وتسجيلها في جدول المعاملات لحظياً دون أي تدخل يدوي.</p>
+          </div>
         </div>
       </div>
     </div>

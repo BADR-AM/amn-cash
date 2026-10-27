@@ -54,14 +54,14 @@ export default function Dashboard({
   };
 
   // Percentages for donut
-  const totalCount = stats.totalCount || 312;
-  const incomingCount = stats.incomingCount || 296;
-  const withdrawalCount = stats.withdrawalCount || 12;
-  const otherCount = stats.otherCount || 4;
+  const totalCount = stats.totalCount || 0;
+  const incomingCount = stats.incomingCount || 0;
+  const withdrawalCount = stats.withdrawalCount || 0;
+  const otherCount = stats.otherCount || 0;
 
-  const incomingPct = Math.round((incomingCount / totalCount) * 100) || 95;
-  const withdrawalPct = Math.round((withdrawalCount / totalCount) * 100) || 4;
-  const otherPct = 100 - (incomingPct + withdrawalPct);
+  const incomingPct = totalCount > 0 ? Math.round((incomingCount / totalCount) * 100) : 0;
+  const withdrawalPct = totalCount > 0 ? Math.round((withdrawalCount / totalCount) * 100) : 0;
+  const otherPct = totalCount > 0 ? Math.max(0, 100 - (incomingPct + withdrawalPct)) : 0;
 
   return (
     <div className="space-y-6 text-right select-none">
@@ -104,7 +104,7 @@ export default function Dashboard({
           </div>
           <div className="mt-4">
             <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">
-              {fmt(stats.totalIncomingEGP || 85200)}
+              {fmt(stats.totalIncomingEGP || 0)}
             </span>
             <span className="text-sm font-bold text-slate-700 mr-1.5">ج</span>
           </div>
@@ -120,7 +120,7 @@ export default function Dashboard({
           </div>
           <div className="mt-4">
             <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">
-              {fmt(stats.totalWithdrawalsEGP || 71000)}
+              {fmt(stats.totalWithdrawalsEGP || 0)}
             </span>
             <span className="text-sm font-bold text-slate-700 mr-1.5">ج</span>
           </div>
@@ -136,7 +136,7 @@ export default function Dashboard({
           </div>
           <div className="mt-4">
             <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">
-              {fmt(stats.totalCostEGP || 710)}
+              {fmt(stats.totalCostEGP || 0)}
             </span>
             <span className="text-sm font-bold text-slate-700 mr-1.5">ج</span>
           </div>
@@ -153,13 +153,10 @@ export default function Dashboard({
           <div className="mt-4 flex items-baseline justify-between">
             <div>
               <span className="text-3xl font-black text-slate-900 tracking-tight font-mono">
-                {fmt(stats.totalProfitEGP || 2840)}
+                {fmt(stats.totalProfitEGP || 0)}
               </span>
               <span className="text-sm font-bold text-slate-700 mr-1.5">ج</span>
             </div>
-            <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-              <span>↑ +12%</span>
-            </span>
           </div>
         </div>
 
@@ -185,7 +182,7 @@ export default function Dashboard({
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5">
                 <span className="text-[11px] font-bold text-slate-500 block mb-1">رسوم الخدمة</span>
                 <span className="text-xl font-black text-slate-900 font-mono">
-                  {fmt(stats.totalFeesEGP || 3550)} ج
+                  {fmt(stats.totalFeesEGP || 0)} ج
                 </span>
               </div>
 
@@ -195,7 +192,7 @@ export default function Dashboard({
               <div className="bg-red-50/70 border border-red-200 rounded-xl p-3.5">
                 <span className="text-[11px] font-bold text-red-700 block mb-1">مصاريف السحب</span>
                 <span className="text-xl font-black text-red-900 font-mono">
-                  {fmt(stats.totalCostEGP || 710)} ج
+                  {fmt(stats.totalCostEGP || 0)} ج
                 </span>
               </div>
 
@@ -205,7 +202,7 @@ export default function Dashboard({
               <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3.5">
                 <span className="text-[11px] font-bold text-emerald-800 block mb-1">الربح الصافي</span>
                 <span className="text-xl font-black text-emerald-700 font-mono">
-                  {fmt(stats.totalProfitEGP || 2840)} ج
+                  {fmt(stats.totalProfitEGP || 0)} ج
                 </span>
               </div>
 

@@ -170,10 +170,10 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
           <button
             onClick={() => setIsWipeModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-[#ca1535] border border-red-200 text-xs font-bold transition-all"
-            title="تصفير البيانات وبدء الاستخدام الفعلي"
+            title="تصفير السجل للبدء من الصفر"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>بدء الاستخدام الفعلي (تصفير)</span>
+            <span>تصفير السجل (0 عملية)</span>
           </button>
         </div>
       </div>
@@ -995,48 +995,28 @@ function WipeDataModal({ isOpen, onClose, onWipe }) {
           </button>
           <div className="flex items-center gap-2 text-red-600">
             <AlertTriangle className="w-5 h-5" />
-            <h3 className="font-extrabold text-base text-slate-800">بدء الاستخدام الفعلي وتصفير البيانات</h3>
+            <h3 className="font-extrabold text-base text-slate-800">تصفير سجل المعاملات بالكامل</h3>
           </div>
         </div>
 
         <p className="text-xs text-slate-600 leading-relaxed font-medium">
-          اختر الإجراء المناسب لتهيئة البرنامج للاستخدام في المحل:
+          هل أنت متأكد من رغبتك في حذف كافة المعاملات نهائياً وتصفير العدادات للبدء من الصفر (0 عملية)؟ لن تتأثر إعدادات المحل أو نسب العمولات.
         </p>
 
-        <div className="space-y-3">
-          {/* Option 1: Clear Mock Data Only */}
-          <button
-            onClick={() => onWipe('MOCK')}
-            className="w-full text-right p-4 rounded-2xl border-2 border-slate-200 hover:border-amber-400 bg-slate-50 hover:bg-amber-50/50 transition-all group"
-          >
-            <strong className="block text-xs font-black text-slate-800 group-hover:text-amber-900 mb-1">
-              1. مسح المعاملات التجريبية فقط (موصى به)
-            </strong>
-            <span className="text-[11px] text-slate-500 block leading-normal">
-              حذف المعاملات التوضيحية الافتراضية (ev_001 إلى ev_007) مع الإبقاء على أي معاملات حقيقية سجلتها بنفسك.
-            </span>
-          </button>
-
-          {/* Option 2: Full Wipe */}
+        <div className="pt-2 flex items-center gap-3">
           <button
             onClick={() => onWipe('ALL')}
-            className="w-full text-right p-4 rounded-2xl border-2 border-red-200 hover:border-red-500 bg-red-50/40 hover:bg-red-50 transition-all group"
+            className="flex-1 py-3 px-4 bg-[#ca1535] hover:bg-[#a70d29] text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 text-center"
           >
-            <strong className="block text-xs font-black text-red-700 mb-1">
-              2. تصفير السجل بالكامل (بدء سجل جديد 0 عملية)
-            </strong>
-            <span className="text-[11px] text-red-600/80 block leading-normal">
-              حذف كافة المعاملات نهائياً وتصفير العدادات تماماً للبدء الفعلي من الصفر، مع الحفاظ على إعدادات المحل والنسب.
-            </span>
+            نعم، تصفير السجل الآن (0 عملية)
+          </button>
+          <button
+            onClick={onClose}
+            className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+          >
+            إلغاء
           </button>
         </div>
-
-        <button
-          onClick={onClose}
-          className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
-        >
-          إلغاء التراجع
-        </button>
       </div>
     </div>
   );

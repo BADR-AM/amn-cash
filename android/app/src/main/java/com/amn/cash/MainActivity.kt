@@ -478,7 +478,7 @@ fun AMNCollectorApp(
                                     shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier.weight(1f).height(44.dp)
                                 ) {
-                                    Text("🧪 إرسال رسالة تجريبية", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("فحص استقبال رسالة VF-Cash", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
 
                                 // Ping server button
