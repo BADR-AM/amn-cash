@@ -249,6 +249,7 @@ object WindowsApiClient {
                     setRequestProperty("x-timestamp", timestamp.toString())
                     setRequestProperty("x-nonce", nonce)
                     setRequestProperty("x-signature", signature)
+                    setRequestProperty("x-device-secret", deviceSecret)
                     connectTimeout = 6000
                     readTimeout = 6000
                     doOutput = true

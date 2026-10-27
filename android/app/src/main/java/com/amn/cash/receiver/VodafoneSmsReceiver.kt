@@ -67,7 +67,9 @@ class VodafoneSmsReceiver : BroadcastReceiver() {
                 text.contains("Vodafone Cash", ignoreCase = true) ||
                 text.contains("محفظتك", ignoreCase = true) ||
                 text.contains("رصيدك الحالي", ignoreCase = true) ||
-                text.contains("تم استلام مبلغ", ignoreCase = true) ||
+                text.contains("تم استلام", ignoreCase = true) ||
+                text.contains("تم إيداع", ignoreCase = true) ||
+                text.contains("إيداع", ignoreCase = true) ||
                 text.contains("تم تحويل", ignoreCase = true) ||
                 text.contains("سحب نقدي", ignoreCase = true) ||
                 text.contains("مصاريف السحب", ignoreCase = true) ||

@@ -64,10 +64,17 @@ export function parseVodafoneCashSms(rawText) {
 
   const normalized = normalizeDigits(rawText);
 
-  // Strict Regex patterns
-  const outgoingMatch = normalized.match(/تم\s+تحويل\s+مبلغ\s+([\d,.]+)\s*(?:جنيه|ج\.م)?\s+إلى\s+(?:رقم\s+)?(\d{10,12})/i);
-  const withdrawalMatch = normalized.match(/تم\s+سحب\s+مبلغ\s+([\d,.]+)\s*(?:جنيه|ج\.م)?/i);
-  const incomingMatch = normalized.match(/تم\s+(?:استلام|إيداع)\s+مبلغ\s+([\d,.]+)\s*(?:جنيه|ج\.م)?(?:\s+من\s+(?:رقم\s+)?(\d{10,12}))?/i);
+  // Flexible, Comprehensive Regex patterns for all Egyptian Vodafone Cash templates
+  // 1. Incoming transfers (استلام / إيداع / تحويل من رقم X إلى محفظتك)
+  const incomingTransferFromMatch = normalized.match(/(?:تم\s+)?تحويل\s+(?:مبلغ\s+)?([\d,.]+)\s*(?:جنيه|ج\.م)?\s+من\s+(?:رقم\s+)?(\d{10,12})/i);
+  const incomingStandardMatch = normalized.match(/(?:تم\s+)?(?:استلام|إيداع)\s+(?:مبلغ\s+)?([\d,.]+)\s*(?:جنيه|ج\.م)?(?:\s+من\s+(?:رقم\s+)?(\d{10,12}))?/i);
+  const incomingMatch = incomingTransferFromMatch || incomingStandardMatch;
+
+  // 2. Outgoing transfers (تحويل إلى رقم X)
+  const outgoingMatch = normalized.match(/(?:تم\s+)?(?:تحويل|إرسال)\s+(?:مبلغ\s+)?([\d,.]+)\s*(?:جنيه|ج\.م)?\s+إلى\s+(?:رقم\s+)?(\d{10,12})/i);
+
+  // 3. Cash Withdrawals (سحب من ATM أو فرع)
+  const withdrawalMatch = normalized.match(/(?:تم\s+)?سحب\s+(?:مبلغ\s+)?([\d,.]+)\s*(?:جنيه|ج\.م)?/i);
 
   // Extract Operation / Reference Number
   const opMatch = normalized.match(/(?:رقم\s+العملية|كود\s+العملية|المرجع|رقم\s+المرجع)\s*(?:هو|:)?\s*(\d{6,16})/i);
