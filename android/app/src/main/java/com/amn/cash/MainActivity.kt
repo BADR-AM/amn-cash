@@ -265,7 +265,7 @@ fun AMNCollectorApp(
                                 Button(
                                     onClick = {
                                         val fullUrl = "http://${manualIpInput.trim()}:5500/api/sms/inbox"
-                                        WindowsApiClient.savePairing(context, fullUrl, "token_mobile")
+                                        WindowsApiClient.savePairing(context, fullUrl, "dev_android_companion", "sim_secret_amn_internal_2026")
                                         serverUrl = fullUrl
                                         CollectorForegroundService.startService(context)
                                         isServiceRunning = true

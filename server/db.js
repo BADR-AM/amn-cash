@@ -18,7 +18,12 @@ if (!fs.existsSync(dataDir)) {
 }
 
 const dbPath = path.join(dataDir, 'amn_cash.sqlite');
-export const db = new sqlite3.Database(dbPath);
+export const db = new sqlite3.Database(dbPath, (err) => {
+  if (!err) {
+    db.run("PRAGMA journal_mode = WAL;");
+    db.run("PRAGMA synchronous = NORMAL;");
+  }
+});
 
 export function runQuery(sql, params = []) {
   return new Promise((resolve, reject) => {
@@ -61,6 +66,7 @@ export async function initDatabase() {
       device_id TEXT UNIQUE,
       device_name TEXT NOT NULL,
       device_ip TEXT,
+      device_secret TEXT NOT NULL DEFAULT '',
       auth_token TEXT,
       status TEXT DEFAULT 'CONNECTED',
       last_sync TEXT,
@@ -68,6 +74,13 @@ export async function initDatabase() {
       created_at TEXT NOT NULL
     )
   `);
+
+  // Migration for existing databases
+  try {
+    await runQuery(`ALTER TABLE devices ADD COLUMN device_secret TEXT DEFAULT ''`);
+  } catch {
+    // Column already exists
+  }
 
   await runQuery(`
     CREATE TABLE IF NOT EXISTS transactions (
@@ -83,7 +96,7 @@ export async function initDatabase() {
       reference_number TEXT,
       current_balance_piasters INTEGER DEFAULT 0,
       raw_sms TEXT,
-      status TEXT DEFAULT 'COMPLETED',
+      status TEXT DEFAULT 'OBSERVED',
       source TEXT DEFAULT 'SMS',
       timestamp TEXT NOT NULL,
       created_at TEXT NOT NULL
@@ -95,9 +108,9 @@ export async function initDatabase() {
     ['fee_per_1000', '50'],
     ['cost_per_1000', '10'],
     ['profit_per_1000', '40'],
-    ['wallet_name', 'محل فودافون كاش - AMN'],
+    ['wallet_name', 'محفظة فودافون كاش - AMN'],
     ['wallet_phone', '01012345678'],
-    ['auto_calc_fees_for_incoming', 'true'],
+    ['auto_calc_fees_for_incoming', 'false'],
     ['theme', 'light']
   ];
 
@@ -105,13 +118,18 @@ export async function initDatabase() {
     await runQuery(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, [k, v]);
   }
 
-  // Seed default phone device if empty
+  // Seed default phone device and simulator if empty
   const devCount = await getQuery(`SELECT COUNT(*) as count FROM devices`);
   if (devCount.count === 0) {
     await runQuery(`
-      INSERT INTO devices (device_id, device_name, device_ip, auth_token, status, last_sync, total_messages, created_at)
-      VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'), ?, datetime('now', 'localtime'))
-    `, ['dev_default_phone', 'هاتف الاستقبال (Android)', '192.168.1.20:5500', 'token_sec_amn_9988', 'CONNECTED', 24]);
+      INSERT INTO devices (device_id, device_name, device_ip, device_secret, auth_token, status, last_sync, total_messages, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), ?, datetime('now', 'localtime'))
+    `, ['dev_default_phone', 'هاتف الاستقبال (Android)', '192.168.1.20:5500', 'token_sec_amn_9988_device_secret_2026', 'token_sec_amn_9988', 'CONNECTED', 24]);
+
+    await runQuery(`
+      INSERT INTO devices (device_id, device_name, device_ip, device_secret, auth_token, status, last_sync, total_messages, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'), ?, datetime('now', 'localtime'))
+    `, ['sms_simulator_phone', 'محاكي الاختبار المدمج', '127.0.0.1:5500', 'sim_secret_amn_internal_2026', 'sim_token_local', 'CONNECTED', 0]);
   }
 
   // Seed sample transactions if empty

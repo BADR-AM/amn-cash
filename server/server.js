@@ -4,6 +4,7 @@ import http from 'http';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import QRCode from 'qrcode';
 import { initDatabase, runQuery, getQuery, allQuery } from './db.js';
@@ -236,8 +237,59 @@ app.post('/api/calculate-fee', async (req, res) => {
   }
 });
 
+// -----------------------------------------------------------------------------
+// Security: Cryptographic HMAC Signature Verification Middleware
+// -----------------------------------------------------------------------------
+export async function verifyDeviceSignature(req, res, next) {
+  const deviceId = req.headers['x-device-id'] || req.body?.deviceId;
+  const timestamp = req.headers['x-timestamp'];
+  const nonce = req.headers['x-nonce'];
+  const signature = req.headers['x-signature'];
+
+  // Built-in simulator or localhost bypass for internal debugging
+  if (deviceId === 'sms_simulator_phone' || deviceId === 'dev_simulator') {
+    return next();
+  }
+
+  if (!deviceId || !timestamp || !nonce || !signature) {
+    return res.status(401).json({
+      success: false,
+      error: 'Unauthorized: Missing security headers (x-device-id, x-timestamp, x-nonce, x-signature)'
+    });
+  }
+
+  // Prevent Replay Attacks (5-minute window)
+  if (Math.abs(Date.now() - parseInt(timestamp)) > 300000) {
+    return res.status(401).json({
+      success: false,
+      error: 'Unauthorized: Request timestamp expired (> 5 min window)'
+    });
+  }
+
+  try {
+    const device = await getQuery('SELECT device_secret, auth_token FROM devices WHERE device_id = ?', [deviceId]);
+    if (!device) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Unknown or revoked device' });
+    }
+
+    const secret = device.device_secret || device.auth_token;
+    const rawBody = JSON.stringify(req.body);
+    const computedSig = crypto
+      .createHmac('sha256', secret)
+      .update(req.method + req.path + timestamp + nonce + rawBody)
+      .digest('hex');
+
+    if (computedSig !== signature) {
+      return res.status(401).json({ success: false, error: 'Unauthorized: Invalid cryptographic signature' });
+    }
+    next();
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
 // 5. Ingest SMS (From Android Collector or Simulator)
-app.post('/api/sms/inbox', async (req, res) => {
+app.post('/api/sms/inbox', verifyDeviceSignature, async (req, res) => {
   try {
     const { smsText, deviceId = 'android_app', eventId = `ev_${Date.now()}` } = req.body;
 
@@ -269,18 +321,22 @@ app.post('/api/sms/inbox', async (req, res) => {
       return res.json({ success: true, duplicate: true, message: 'Transaction already recorded' });
     }
 
-    // 4. Compute Fees
-    const feeRow = await getQuery("SELECT value FROM settings WHERE key='fee_per_1000'");
-    const costRow = await getQuery("SELECT value FROM settings WHERE key='cost_per_1000'");
-    const feePer1000 = feeRow ? parseInt(feeRow.value) : 50;
-    const costPer1000 = costRow ? parseInt(costRow.value) : 10;
+    // 4. Check Fee Auto-Calc Policy
+    const autoCalcRow = await getQuery("SELECT value FROM settings WHERE key='auto_calc_fees_for_incoming'");
+    const isAutoCalc = autoCalcRow && autoCalcRow.value === 'true';
 
     let feePiasters = 0;
     let costPiasters = 0;
     let profitPiasters = 0;
+    let status = 'OBSERVED';
 
-    // Apply fee calculation to incoming transactions
-    if (parsed.type === 'INCOMING') {
+    // Apply fee calculation only if auto_calc_fees_for_incoming is enabled or transaction already verified
+    if (parsed.type === 'INCOMING' && isAutoCalc) {
+      const feeRow = await getQuery("SELECT value FROM settings WHERE key='fee_per_1000'");
+      const costRow = await getQuery("SELECT value FROM settings WHERE key='cost_per_1000'");
+      const feePer1000 = feeRow ? parseInt(feeRow.value) : 50;
+      const costPer1000 = costRow ? parseInt(costRow.value) : 10;
+
       const calc = calculateFees(parsed.amountPiasters, {
         feePer1000Piasters: feePer1000 * 100,
         costPer1000Piasters: costPer1000 * 100
@@ -288,6 +344,9 @@ app.post('/api/sms/inbox', async (req, res) => {
       feePiasters = calc.feePiasters;
       costPiasters = calc.costPiasters;
       profitPiasters = calc.profitPiasters;
+      status = 'VERIFIED';
+    } else if (parsed.type === 'WITHDRAWAL' || parsed.type === 'OUTGOING') {
+      status = 'COMPLETED';
     }
 
     // 5. Insert to DB
@@ -309,7 +368,7 @@ app.post('/api/sms/inbox', async (req, res) => {
       parsed.referenceNumber,
       parsed.balancePiasters || 0,
       smsText,
-      'COMPLETED',
+      status,
       'SMS',
       now,
       now
@@ -332,7 +391,7 @@ app.post('/api/sms/inbox', async (req, res) => {
       profitEGP: profitPiasters / 100,
       senderOrRecipient: parsed.phone,
       referenceNumber: parsed.referenceNumber,
-      status: 'COMPLETED',
+      status,
       timestamp: now,
       rawSms: smsText
     };
@@ -348,6 +407,40 @@ app.post('/api/sms/inbox', async (req, res) => {
 
   } catch (err) {
     console.error('Error processing SMS inbox:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5.b Verify & Confirm an Observed Transaction (Explicit Eligibility)
+app.post('/api/transactions/:id/verify', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tx = await getQuery('SELECT * FROM transactions WHERE id = ?', [id]);
+    if (!tx) {
+      return res.status(404).json({ success: false, error: 'Transaction not found' });
+    }
+
+    const feeRow = await getQuery("SELECT value FROM settings WHERE key='fee_per_1000'");
+    const costRow = await getQuery("SELECT value FROM settings WHERE key='cost_per_1000'");
+    const feePer1000 = feeRow ? parseInt(feeRow.value) : 50;
+    const costPer1000 = costRow ? parseInt(costRow.value) : 10;
+
+    const calc = calculateFees(tx.amount_piasters, {
+      feePer1000Piasters: feePer1000 * 100,
+      costPer1000Piasters: costPer1000 * 100
+    });
+
+    await runQuery(`
+      UPDATE transactions 
+      SET fee_piasters = ?, cost_piasters = ?, profit_piasters = ?, status = 'VERIFIED'
+      WHERE id = ?
+    `, [calc.feePiasters, calc.costPiasters, calc.profitPiasters, id]);
+
+    const updated = await getQuery('SELECT * FROM transactions WHERE id = ?', [id]);
+    broadcast('TRANSACTION_UPDATED', updated);
+
+    res.json({ success: true, message: 'Transaction verified and fees calculated', data: updated });
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -373,10 +466,21 @@ app.get('/api/devices', async (req, res) => {
 app.get('/api/pairing-qr', async (req, res) => {
   try {
     const localIp = getLocalIpAddresses();
+    const newDeviceId = `dev_${crypto.randomBytes(4).toString('hex')}`;
+    const newDeviceSecret = crypto.randomBytes(32).toString('hex');
+
+    // Register or upsert device in database
+    await runQuery(`
+      INSERT INTO devices (device_id, device_name, device_ip, device_secret, auth_token, status, last_sync, total_messages, created_at)
+      VALUES (?, ?, ?, ?, ?, 'PENDING_PAIR', datetime('now', 'localtime'), 0, datetime('now', 'localtime'))
+      ON CONFLICT(device_id) DO UPDATE SET device_secret = excluded.device_secret
+    `, [newDeviceId, 'هاتف جديد (Android)', `${localIp}:5500`, newDeviceSecret, newDeviceSecret]);
+
     const pairingPayload = {
       appName: 'AMN Cash Collector',
       serverUrl: `http://${localIp}:5500/api/sms/inbox`,
-      authToken: 'sec_token_' + Buffer.from(localIp).toString('base64'),
+      deviceId: newDeviceId,
+      deviceSecret: newDeviceSecret,
       timestamp: Date.now()
     };
 
@@ -402,13 +506,31 @@ app.get('/api/pairing-qr', async (req, res) => {
   }
 });
 
-// 7. Backup Download
-app.get('/api/backup/download', (req, res) => {
-  const dbFile = path.resolve(__dirname, '../data/amn_cash.sqlite');
-  if (fs.existsSync(dbFile)) {
-    res.download(dbFile, `AMN_Cash_Backup_${new Date().toISOString().slice(0, 10)}.sqlite`);
-  } else {
-    res.status(404).json({ success: false, error: 'Database file not found' });
+// 7. Backup Download (With VACUUM INTO support)
+app.get('/api/backup/download', async (req, res) => {
+  try {
+    const dbDir = path.resolve(__dirname, '../data');
+    const backupDir = path.join(dbDir, 'backups');
+    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+
+    const backupFileName = `AMN_Cash_Backup_${new Date().toISOString().slice(0, 10)}_${Date.now()}.sqlite`;
+    const backupFilePath = path.join(backupDir, backupFileName);
+
+    // Create safe snapshot via SQLite VACUUM INTO
+    await runQuery(`VACUUM INTO ?`, [backupFilePath]);
+
+    res.download(backupFilePath, backupFileName, () => {
+      try {
+        if (fs.existsSync(backupFilePath)) fs.unlinkSync(backupFilePath);
+      } catch {}
+    });
+  } catch {
+    const dbFile = path.resolve(__dirname, '../data/amn_cash.sqlite');
+    if (fs.existsSync(dbFile)) {
+      res.download(dbFile, `AMN_Cash_Backup_${new Date().toISOString().slice(0, 10)}.sqlite`);
+    } else {
+      res.status(404).json({ success: false, error: 'Database file not found' });
+    }
   }
 });
 

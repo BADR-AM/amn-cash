@@ -47,7 +47,19 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
     if (filterType === 'INCOMING' && tx.type !== 'INCOMING') return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      return (
+      const handleVerify = async (txId) => {
+    try {
+      const res = await fetch(`/api/transactions/${txId}/verify`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        if (onRefresh) onRefresh();
+      }
+    } catch (err) {
+      console.error('Failed to verify transaction:', err);
+    }
+  };
+
+  return (
         tx.senderOrRecipient?.toLowerCase().includes(q) ||
         tx.referenceNumber?.toLowerCase().includes(q) ||
         String(tx.amountEGP).includes(q)
@@ -55,6 +67,18 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
     }
     return true;
   });
+
+  const handleVerify = async (txId) => {
+    try {
+      const res = await fetch(`/api/transactions/${txId}/verify`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        if (onRefresh) onRefresh();
+      }
+    } catch (err) {
+      console.error('Failed to verify transaction:', err);
+    }
+  };
 
   return (
     <div className="space-y-6 text-right select-none">
@@ -276,12 +300,33 @@ export default function Transactions({ transactions = [], settings, onRefresh, o
                       {tx.timestamp}
                     </td>
 
-                    {/* Status Pill Matching Image 3 */}
+                    {/* Status Pill Matching Handoff V2 Specification */}
                     <td className="py-3.5 px-5 text-center">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        <span>مكتملة</span>
-                      </span>
+                      {tx.status === 'OBSERVED' ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px] border border-amber-200">
+                            <Clock className="w-3 h-3 text-amber-600" />
+                            <span>ملاحظة (بانتظار التأكيد)</span>
+                          </span>
+                          <button
+                            onClick={() => handleVerify(tx.id)}
+                            className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] transition-colors shadow-sm"
+                            title="تأكيد العملية واحتساب العمولة"
+                          >
+                            تأكيد العمولة
+                          </button>
+                        </div>
+                      ) : tx.status === 'VERIFIED' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
+                          <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                          <span>مؤكدة ومحتسبة</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px] border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>مكتملة</span>
+                        </span>
+                      )}
                     </td>
 
                     {/* Actions */}
